@@ -40,6 +40,8 @@ builder.Services.AddSingleton<AuditLogMapper>();
 builder.Services.AddScoped<IFeatureFlagsService, FeatureFlagsService>();
 builder.Services.AddScoped<IEvaluationService, EvaluationService>();
 builder.Services.AddScoped<IAuditLogsService, AuditLogsService>();
+builder.Services.AddSingleton<AuditLogQueue>();
+builder.Services.AddHostedService<AuditLogBackgroundService>();
 builder.Services.AddEndpoints(typeof(Program).Assembly);
 builder.Services.Decorate<IKeyedRepository<FeatureFlag>, CachedKeyedRepository<FeatureFlag>>();
 builder.Services.AddMemoryCache();

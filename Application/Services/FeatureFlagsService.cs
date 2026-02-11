@@ -10,7 +10,7 @@ namespace Application.Services;
 public sealed class FeatureFlagsService(
     IKeyedRepository<FeatureFlag> featureFlagRepository,
     FeatureFlagMapper mapper,
-    IAuditLogsService auditLogsService)
+    AuditLogQueue auditLogQueue)
     : IFeatureFlagsService
 {
     public async Task<FeatureFlagDTO?> GetAsync(Guid id)
@@ -75,7 +75,7 @@ public sealed class FeatureFlagsService(
             PerformedByUserId = performedByUserId,
             PerformedByUserEmail = performedByUserEmail
         };
-        await auditLogsService.AppendAsync(auditLog);
+        _ = auditLogQueue.QueueAuditLogAsync(auditLog);
 
         return mapper.FeatureFlagToFeatureFlagDto(created);
     }
@@ -117,7 +117,7 @@ public sealed class FeatureFlagsService(
             PerformedByUserId = performedByUserId,
             PerformedByUserEmail = performedByUserEmail
         };
-        await auditLogsService.AppendAsync(auditLog);
+        _ = auditLogQueue.QueueAuditLogAsync(auditLog);
 
         return mapper.FeatureFlagToFeatureFlagDto(updated);
     }
@@ -140,6 +140,6 @@ public sealed class FeatureFlagsService(
             PerformedByUserId = performedByUserId,
             PerformedByUserEmail = performedByUserEmail
         };
-        await auditLogsService.AppendAsync(auditLog);
+        _ = auditLogQueue.QueueAuditLogAsync(auditLog);
     }
 }

@@ -4,6 +4,7 @@ using Application.Interfaces;
 using Application.Services;
 using Domain;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 using SharedKernel;
 
@@ -12,15 +13,16 @@ namespace Application.Tests;
 public class FeatureFlagsServiceTests
 {
     private readonly IKeyedRepository<FeatureFlag> _repository;
-    private readonly IAuditLogsService _auditLogService;
+    private readonly AuditLogQueue _auditLogQueue;
     private readonly IFeatureFlagsService _service;
 
     public FeatureFlagsServiceTests()
     {
         _repository = Substitute.For<IKeyedRepository<FeatureFlag>>();
-        _auditLogService = Substitute.For<IAuditLogsService>();
+        var logger = Substitute.For<ILogger<AuditLogQueue>>();
+        _auditLogQueue = new AuditLogQueue(logger);
         var mapper = new FeatureFlagMapper();
-        _service = new FeatureFlagsService(_repository, mapper, _auditLogService);
+        _service = new FeatureFlagsService(_repository, mapper, _auditLogQueue);
     }
 
     #region GetAllAsync Tests
