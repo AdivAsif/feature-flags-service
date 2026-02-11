@@ -35,7 +35,7 @@ public sealed class EvaluationService(IRepository<FeatureFlag> featureFlagReposi
         var defaultResult = new EvaluationResultDTO
         {
             Allowed = featureFlag.Enabled,
-            Reason = featureFlag.Enabled ? "Feature flag is enabled" : "Feature flag is disabled",
+            Reason = featureFlag.Enabled ? "Feature flag is enabled" : "Feature flag is disabled"
         };
 
         var featureFlagRules = featureFlag.Parameters;

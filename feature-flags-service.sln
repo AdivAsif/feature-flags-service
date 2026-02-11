@@ -12,11 +12,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api", "Web.Api\Web.Api.
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{9D75E543-77E9-4F03-B39A-35B9FF40A32E}"
 	ProjectSection(SolutionItems) = preProject
-		compose.yaml = compose.yaml
-		ARCHITECTURE.md = ARCHITECTURE.md
-		INFRASTRUCTURE.md = INFRASTRUCTURE.md
+		compose.prod.yaml = compose.prod.yaml
 		prometheus.yml = prometheus.yml
-		README.md = README.md
+		k6-load-test.js = k6-load-test.js
+		compose.dev.yaml = compose.dev.yaml
+		compose.local.yaml = compose.local.yaml
+		Dockerfile = Dockerfile
+		k6.local.mixed.js = k6.local.mixed.js
+		k6.local.read-heavy.js = k6.local.read-heavy.js
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedKernel", "SharedKernel\SharedKernel.csproj", "{2B3925C0-EAB3-40B6-B3C3-3EA42B512FF9}"
@@ -30,6 +33,21 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api.Tests", "Web.Api.Tests\Web.Api.Tests.csproj", "{1978E6A7-1049-4A1F-A190-AF1FB229A8A8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Domain.Tests", "Domain.Tests\Domain.Tests.csproj", "{04F50C7D-3E46-4574-9460-29461F2D852F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{955A5248-7E63-4D71-8FDD-F1C3DD3E4847}"
+	ProjectSection(SolutionItems) = preProject
+		ARCHITECTURE.md = ARCHITECTURE.md
+		PAGINATION.md = PAGINATION.md
+		DATABASE-MIGRATIONS.md = DATABASE-MIGRATIONS.md
+		ETAG.md = ETAG.md
+		INFRASTRUCTURE.md = INFRASTRUCTURE.md
+		K6-DOCKER.md = K6-DOCKER.md
+		K6-TEST-SCENARIOS.md = K6-TEST-SCENARIOS.md
+		MONITORING.md = MONITORING.md
+		QUICKSTART-MONITORING.md = QUICKSTART-MONITORING.md
+		README.md = README.md
+		TESTING.md = TESTING.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

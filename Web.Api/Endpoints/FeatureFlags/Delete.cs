@@ -1,8 +1,5 @@
-using Application.Interfaces;
 using Application.Exceptions;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
+using Application.Interfaces;
 
 namespace Web.Api.Endpoints.FeatureFlags;
 
@@ -10,7 +7,7 @@ public class Delete : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapDelete("/feature-flags/delete/{key}",
+        app.MapDelete("/feature-flags/{key}",
             async (string key, IFeatureFlagsService featureFlagsService, ILogger<Delete> logger) =>
             {
                 try

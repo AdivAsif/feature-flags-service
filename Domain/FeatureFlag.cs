@@ -6,10 +6,10 @@ namespace Domain;
 public sealed class FeatureFlag : EntityBase, IHasKey
 {
     public int Version { get; set; } = 1; // version is an integer for optimistic concurrency control (OCC)
-    [MaxLength(100)] public string Key { get; set; } = string.Empty;
     [MaxLength(255)] public string Description { get; set; } = string.Empty;
     public bool Enabled { get; set; } // global killswitch
     public FeatureFlagParameters[] Parameters { get; set; } = []; // parameters to determine who gets access to what
+    [MaxLength(100)] public string Key { get; set; } = string.Empty;
 }
 
 public sealed class FeatureFlagParameters
@@ -26,5 +26,5 @@ public enum RuleType
     Group = 1, // i.e., group A enabled, rest of the groups disabled (beta testers and such)
     User = 2, // i.e., specific user enabled
     Tenant = 3, // i.e., tenant A enabled, rest of the tenants disabled (enterprise customers and such)
-    Environment = 4, // i.e., dev, test, prod
+    Environment = 4 // i.e., dev, test, prod
 }

@@ -2,7 +2,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Application.DTOs;
-using Application.Exceptions;
 using Application.Interfaces;
 using Application.Services;
 using Domain;
@@ -11,10 +10,12 @@ using Infrastructure.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.IdentityModel.Tokens;
+using Prometheus;
 using Scalar.AspNetCore;
 using Serilog;
 using SharedKernel;
 using Web.Api.Extensions;
+using Web.Api.Middleware;
 using ZiggyCreatures.Caching.Fusion;
 using ZiggyCreatures.Caching.Fusion.Backplane.StackExchangeRedis;
 using ZiggyCreatures.Caching.Fusion.Serialization.SystemTextJson;
@@ -90,31 +91,35 @@ builder.Services.AddFusionCache()
     );
 
 builder.Services.AddJwtBearerAuthentication(builder.Configuration);
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("CanReadFlags", policy => policy.RequireClaim("scope", "flags:read"));
-    options.AddPolicy("CanWriteFlags", policy => policy.RequireClaim("scope", "flags:write"));
-    options.AddPolicy("CanDeleteFlags", policy => policy.RequireClaim("scope", "flags:delete"));
-
-    options.AddPolicy("User", policy => policy.RequireClaim("role", "user"));
-    options.AddPolicy("Admin", policy => policy.RequireClaim("role", "admin"));
-
-    options.AddPolicy("ReadAccess", policy =>
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("CanReadFlags", policy => policy.RequireClaim("scope", "flags:read"))
+    .AddPolicy("CanWriteFlags", policy => policy.RequireClaim("scope", "flags:write"))
+    .AddPolicy("CanDeleteFlags", policy => policy.RequireClaim("scope", "flags:delete"))
+    .AddPolicy("User", policy => policy.RequireClaim("role", "user"))
+    .AddPolicy("Admin", policy => policy.RequireClaim("role", "admin"))
+    .AddPolicy("ReadAccess", policy =>
         policy.RequireAssertion(context =>
-            context.User.HasClaim(c => c.Type == "scope" && c.Value.Split(' ').Contains("flags:read"))
-            || context.User.HasClaim("role", "user")
-            || context.User.HasClaim("role", "admin")));
-
-    options.AddPolicy("WriteAccess", policy =>
+        {
+            var hasScope = context.User.HasClaim(c => c.Type == "scope" && c.Value.Split(' ').Contains("flags:read"));
+            var isUser = context.User.HasClaim("role", "user");
+            var isAdmin = context.User.HasClaim("role", "admin");
+            return hasScope || isUser || isAdmin;
+        }))
+    .AddPolicy("WriteAccess", policy =>
         policy.RequireAssertion(context =>
-            context.User.HasClaim(c => c.Type == "scope" && c.Value.Split(' ').Contains("flags:write"))
-            || context.User.HasClaim("role", "admin")));
-
-    options.AddPolicy("DeleteAccess", policy =>
+        {
+            var hasScope = context.User.HasClaim(c => c.Type == "scope" && c.Value.Split(' ').Contains("flags:write"));
+            var isAdmin = context.User.HasClaim("role", "admin");
+            return hasScope || isAdmin;
+        }))
+    .AddPolicy("DeleteAccess", policy =>
         policy.RequireAssertion(context =>
-            context.User.HasClaim("role", "admin") ||
-            context.User.HasClaim(c => c.Type == "scope" && c.Value.Split(' ').Contains("flags:delete"))));
-});
+        {
+            var hasScope = context.User.HasClaim(c => c.Type == "scope" && c.Value.Split(' ').Contains("flags:delete"));
+            var isAdmin = context.User.HasClaim("role", "admin");
+            return hasScope || isAdmin;
+        }));
+builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
@@ -152,10 +157,20 @@ if (app.Environment.IsDevelopment())
     }).AllowAnonymous();
 }
 
+app.MapHealthChecks("/health");
 app.UseAuthentication();
 app.UseHttpsRedirection();
 app.UseAuthorization();
 
+app.UseMiddleware<ETagMiddleware>();
+
+// Prometheus metrics endpoint
+app.UseHttpMetrics();
+app.MapMetrics();
+
 app.MapEndpoints();
+
+// Apply database migrations on startup
+await app.Services.ApplyMigrationsAsync();
 
 app.Run();

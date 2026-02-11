@@ -30,6 +30,24 @@ public sealed class FeatureFlagsService(IRepository<FeatureFlag> featureFlagRepo
         return mapper.FeatureFlagsToFeatureFlagDtos(await featureFlagRepository.GetAllAsync(take, skip));
     }
 
+    public async Task<PagedFeatureFlagDTO> GetPagedAsync(int first = 10, string? after = null, string? before = null)
+    {
+        var pagedResult = await featureFlagRepository.GetPagedAsync(first, after, before);
+
+        return new PagedFeatureFlagDTO
+        {
+            Items = mapper.FeatureFlagsToFeatureFlagDtos(pagedResult.Items),
+            PageInfo = new PaginationInfo
+            {
+                HasNextPage = pagedResult.PageInfo.HasNextPage,
+                HasPreviousPage = pagedResult.PageInfo.HasPreviousPage,
+                StartCursor = pagedResult.PageInfo.StartCursor,
+                EndCursor = pagedResult.PageInfo.EndCursor,
+                TotalCount = pagedResult.PageInfo.TotalCount
+            }
+        };
+    }
+
     public async Task<FeatureFlagDTO> CreateAsync(FeatureFlagDTO featureFlag)
     {
         if (featureFlag.Key == null) throw new BadRequestException("Feature Flag key is required");

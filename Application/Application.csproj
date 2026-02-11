@@ -15,6 +15,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="FluentValidation" Version="12.1.1"/>
         <PackageReference Include="Riok.Mapperly" Version="5.0.0-next.0"/>
     </ItemGroup>
 

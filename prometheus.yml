@@ -4,16 +4,22 @@ global:
   # Attach these labels to any time series or alerts when communicating with
   # external systems (federation, remote storage, Alertmanager).
   external_labels:
-    monitor: 'my-monitor'
+    monitor: 'feature-flags-monitor'
 
 # A scrape configuration containing exactly one endpoint to scrape:
-# Here it's Prometheus itself.
 scrape_configs:
-  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  # Prometheus self-monitoring
   - job_name: 'prometheus'
-
-    # Override the global default and scrape targets from this job every 5 seconds.
     scrape_interval: 5s
-
     static_configs:
       - targets: [ 'prometheus:9090' ]
+
+  # Feature Flags Service
+  - job_name: 'feature-flags-service'
+    scrape_interval: 5s
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: [ 'api:8080' ]
+        labels:
+          service: 'feature-flags-api'
+          environment: 'docker'

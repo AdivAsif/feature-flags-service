@@ -1,9 +1,7 @@
 using Application.DTOs;
-using Application.Interfaces;
 using Application.Exceptions;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
+using Application.Interfaces;
+using Web.Api.Extensions;
 
 namespace Web.Api.Endpoints.FeatureFlags;
 
@@ -12,12 +10,18 @@ public class Create : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPost("/feature-flags",
-            async (FeatureFlagDTO featureFlag, IFeatureFlagsService featureFlagsService, ILogger<Create> logger) =>
+            async (FeatureFlagDTO featureFlag, HttpContext httpContext, IFeatureFlagsService featureFlagsService,
+                ILogger<Create> logger) =>
             {
                 try
                 {
                     logger.LogInformation("Creating feature flag with key: {Key}", featureFlag.Key);
                     var createdFeatureFlag = await featureFlagsService.CreateAsync(featureFlag);
+
+                    // Set ETag for the created resource
+                    var etag = createdFeatureFlag.GenerateETag();
+                    httpContext.Response.Headers.ETag = etag;
+
                     return Results.CreatedAtRoute("GetFeatureFlagByKey", new { key = createdFeatureFlag.Key },
                         createdFeatureFlag);
                 }

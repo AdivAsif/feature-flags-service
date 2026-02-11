@@ -1,10 +1,7 @@
 using System.Security.Claims;
-using Application.Interfaces;
 using Application.Exceptions;
+using Application.Interfaces;
 using Web.Api.Extensions;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
 
 namespace Web.Api.Endpoints.Evaluation;
 
@@ -13,13 +10,15 @@ public class Evaluate : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapGet("/evaluation/{featureFlagKey}",
-                async (string featureFlagKey, IEvaluationService evaluationService, ClaimsPrincipal user, ILogger<Evaluate> logger) =>
+                async (string featureFlagKey, IEvaluationService evaluationService, ClaimsPrincipal user,
+                    ILogger<Evaluate> logger) =>
                 {
                     try
                     {
                         var context = user.ToEvaluationContext();
-                        logger.LogInformation("Evaluating feature flag: {Key} for user: {UserId}", featureFlagKey, context.UserId);
-                        
+                        logger.LogInformation("Evaluating feature flag: {Key} for user: {UserId}", featureFlagKey,
+                            context.UserId);
+
                         var result = await evaluationService.EvaluateAsync(featureFlagKey, context);
                         return Results.Ok(result);
                     }

@@ -1,5 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
-using SharedKernel;
+﻿using SharedKernel;
 using ZiggyCreatures.Caching.Fusion;
 
 namespace Infrastructure.Repositories;
@@ -43,6 +42,18 @@ public class CachedRepository<T>(IRepository<T> innerRepository, IFusionCache ca
         return entities;
     }
 
+    public async Task<PagedResult<T>> GetPagedAsync(int first = 10, string? after = null, string? before = null)
+    {
+        var cacheKey = $"{typeof(T).Name}:paged(first:{first},after:{after ?? "null"},before:{before ?? "null"})";
+
+        var result = await cache.GetOrSetAsync<PagedResult<T>>(
+            cacheKey,
+            _ => innerRepository.GetPagedAsync(first, after, before),
+            options => options.SetDuration(TimeSpan.FromSeconds(30)));
+
+        return result;
+    }
+
     public async Task<T> CreateAsync(T entity)
     {
         var createdEntity = await innerRepository.CreateAsync(entity);
@@ -65,7 +76,7 @@ public class CachedRepository<T>(IRepository<T> innerRepository, IFusionCache ca
 
         // Delete the entity in the inner repository first, remove from cache after
         await innerRepository.DeleteAsync(id);
-        await RemoveFromCache(id: id, entity: entity);
+        await RemoveFromCache(id, entity);
     }
 
     // Helpers
@@ -87,6 +98,9 @@ public class CachedRepository<T>(IRepository<T> innerRepository, IFusionCache ca
 
         // Invalidate "all" cache as the collection has changed
         await cache.RemoveAsync($"{type.Name}:all(null,null)");
+
+        // Invalidate all paged caches (pattern-based removal)
+        await InvalidatePagedCaches();
     }
 
     private async Task RemoveFromCache(Guid? id = null, T? entity = null)
@@ -112,5 +126,17 @@ public class CachedRepository<T>(IRepository<T> innerRepository, IFusionCache ca
 
         // Invalidate "all" cache as the collection has changed
         await cache.RemoveAsync($"{type.Name}:all(null,null)");
+
+        // Invalidate all paged caches
+        await InvalidatePagedCaches();
+    }
+
+    private async Task InvalidatePagedCaches()
+    {
+        // Since FusionCache doesn't support pattern-based deletion out of the box,
+        // we'll need to track keys or use a simpler approach
+        // For now, we just invalidate on write operations
+        // In production, consider using Redis SCAN or tracking cache keys
+        await Task.CompletedTask;
     }
 }

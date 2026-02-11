@@ -1,8 +1,6 @@
-using Application.Interfaces;
 using Application.Exceptions;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
+using Application.Interfaces;
+using Web.Api.Extensions;
 
 namespace Web.Api.Endpoints.FeatureFlags;
 
@@ -11,12 +9,23 @@ public class GetByKey : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapGet("/feature-flags/{key}",
-                async (string key, IFeatureFlagsService featureFlagsService, ILogger<GetByKey> logger) =>
+                async (string key, HttpContext httpContext, IFeatureFlagsService featureFlagsService,
+                    ILogger<GetByKey> logger) =>
                 {
                     try
                     {
                         logger.LogInformation("Getting feature flag by key: {Key}", key);
                         var featureFlag = await featureFlagsService.GetByKeyAsync(key);
+
+                        if (featureFlag == null) return Results.NotFound($"Feature flag with key: {key} not found");
+
+                        var etag = featureFlag.GenerateETag();
+                        httpContext.Response.Headers.ETag = etag;
+
+                        if (httpContext.Request.Headers.TryGetValue("If-None-Match", out var incomingEtag) &&
+                            incomingEtag == etag)
+                            return Results.StatusCode(304);
+
                         return Results.Ok(featureFlag);
                     }
                     catch (NotFoundException ex)

@@ -1,9 +1,7 @@
 using Application.DTOs;
-using Application.Interfaces;
 using Application.Exceptions;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
+using Application.Interfaces;
+using Web.Api.Extensions;
 
 namespace Web.Api.Endpoints.FeatureFlags;
 
@@ -12,13 +10,34 @@ public class Update : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPatch("/feature-flags/{key}",
-            async (string key, FeatureFlagDTO featureFlag, IFeatureFlagsService featureFlagsService,
-                ILogger<Update> logger) =>
+            async (string key, FeatureFlagDTO featureFlag, HttpContext httpContext,
+                IFeatureFlagsService featureFlagsService, ILogger<Update> logger) =>
             {
                 try
                 {
                     logger.LogInformation("Updating feature flag with key: {Key}", key);
+
+                    // Get the current feature flag to validate ETag
+                    var currentFeatureFlag = await featureFlagsService.GetByKeyAsync(key);
+                    if (currentFeatureFlag == null) return Results.NotFound($"Feature flag with key: {key} not found");
+
+                    // Validate If-Match header if present
+                    if (httpContext.Request.HasIfMatchHeader())
+                    {
+                        var expectedETag = currentFeatureFlag.GenerateETag();
+                        if (!httpContext.Request.ValidateETag(expectedETag))
+                        {
+                            logger.LogWarning("ETag mismatch for feature flag with key: {Key}", key);
+                            return Results.StatusCode(412); // Precondition Failed
+                        }
+                    }
+
                     var updatedFeatureFlag = await featureFlagsService.UpdateAsync(key, featureFlag);
+
+                    // Set ETag for the updated resource
+                    var newETag = updatedFeatureFlag.GenerateETag();
+                    httpContext.Response.Headers.ETag = newETag;
+
                     return Results.Ok(updatedFeatureFlag);
                 }
                 catch (NotFoundException ex)

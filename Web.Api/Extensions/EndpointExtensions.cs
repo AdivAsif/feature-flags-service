@@ -1,10 +1,8 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Hosting;
 using System.Reflection;
-using Microsoft.AspNetCore.Builder;
 using System.Security.Claims;
 using Domain;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Web.Api.Endpoints;
 
 namespace Web.Api.Extensions;
 
@@ -15,8 +13,8 @@ public static class EndpointExtensions
         var serviceDescriptors = assembly
             .GetTypes()
             .Where(type => type is { IsAbstract: false, IsInterface: false } &&
-                           type.IsAssignableTo(typeof(Endpoints.IEndpoint)))
-            .Select(type => ServiceDescriptor.Transient(typeof(Endpoints.IEndpoint), type));
+                           type.IsAssignableTo(typeof(IEndpoint)))
+            .Select(type => ServiceDescriptor.Transient(typeof(IEndpoint), type));
 
         services.TryAddEnumerable(serviceDescriptors);
 
@@ -25,7 +23,7 @@ public static class EndpointExtensions
 
     public static IApplicationBuilder MapEndpoints(this WebApplication app)
     {
-        var endpoints = app.Services.GetRequiredService<IEnumerable<Endpoints.IEndpoint>>();
+        var endpoints = app.Services.GetRequiredService<IEnumerable<IEndpoint>>();
 
         foreach (var endpoint in endpoints)
             endpoint.MapEndpoint(app);
