@@ -37,7 +37,7 @@ public sealed class ApiKeyService(IApiKeyRepository apiKeyRepository, IProjectRe
             UpdatedAt = k.UpdatedAt
         });
     }
-    
+
     // CREATE
     public async Task<ApiKeyCreatedResponse> CreateAsync(Guid projectId, CreateApiKeyRequest dto,
         string createdByUserId,

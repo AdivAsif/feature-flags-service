@@ -23,11 +23,9 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using Prometheus;
 using Scalar.AspNetCore;
-using Serilog;
 using StackExchange.Redis;
 using Web.Api.Extensions;
 using Web.Api.Hubs;
-using Web.Api.JsonContexts;
 using Web.Api.Middleware;
 using Web.Api.Services;
 using ZiggyCreatures.Caching.Fusion;
@@ -47,10 +45,11 @@ builder.Services.AddApiVersioning(options =>
     options.ReportApiVersions = true;
 });
 
-var logger = new LoggerConfiguration()
-    .CreateLogger();
-
-Log.Logger = logger;
+// If extensive logging is required, will use Serilog
+// var logger = new LoggerConfiguration()
+//     .CreateLogger();
+//
+// Log.Logger = logger;
 
 builder.Services.AddOpenApi(options =>
 {
@@ -194,11 +193,7 @@ builder.Services.AddFusionCache()
         Size = 1,
         JitterMaxDuration = TimeSpan.FromMilliseconds(100)
     })
-    .WithSerializer(
-        new FusionCacheSystemTextJsonSerializer(new JsonSerializerOptions
-        {
-            TypeInfoResolver = ApiJsonContext.Default
-        }))
+    .WithSerializer(new FusionCacheSystemTextJsonSerializer(new JsonSerializerOptions()))
     .WithDistributedCache(instrumentedRedisCache)
     .WithBackplane(
         new RedisBackplane(new RedisBackplaneOptions

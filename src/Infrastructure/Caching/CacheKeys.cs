@@ -72,7 +72,7 @@ public static class CacheKeys
             ? ZString.Concat("eval:", projectId, ":", flagKey, ":v", flagVersion, ":", userId, ":", contextHash)
             : ZString.Concat("eval:", projectId, ":", flagKey, ":v", flagVersion, ":", userId);
     }
-    
+
     // Generate a hash for complex evaluation contexts to use in cache keys, ulong instead of strings -> 8 bytes vs.
     // potentially much more with strings
     public static ulong HashContext(IEnumerable<string>? groups)
@@ -105,16 +105,17 @@ public static class CacheKeys
         // Domain separation using delimiter
         hasher.Append("|groups"u8);
 
+        Span<byte> buffer = stackalloc byte[256];
+
         foreach (var g in groups)
         {
             hasher.Append(","u8);
 
             var maxBytes = Encoding.UTF8.GetMaxByteCount(g.Length);
 
-            if (maxBytes <= 256)
+            if (maxBytes <= buffer.Length)
             {
                 // For small strings, we can avoid allocating on the heap and use stack allocation for better performance
-                Span<byte> buffer = stackalloc byte[256];
                 var written = Encoding.UTF8.GetBytes(g, buffer);
                 hasher.Append(buffer[..written]);
             }

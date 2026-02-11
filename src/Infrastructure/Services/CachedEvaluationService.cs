@@ -2,6 +2,7 @@ using Application.Interfaces;
 using Application.Interfaces.Repositories;
 using Contracts.Models;
 using Contracts.Responses;
+using Domain;
 using Infrastructure.Caching;
 using ZiggyCreatures.Caching.Fusion;
 
@@ -53,7 +54,7 @@ public sealed class CachedEvaluationService(
             cancellationToken);
     }
 
-    public Task<EvaluationResponse> EvaluateAsync(Domain.FeatureFlag featureFlag, EvaluationContext context,
+    public Task<EvaluationResponse> EvaluateAsync(FeatureFlag featureFlag, EvaluationContext context,
         CancellationToken cancellationToken = default)
     {
         // Method to avoid calling the flag twice because of decoration

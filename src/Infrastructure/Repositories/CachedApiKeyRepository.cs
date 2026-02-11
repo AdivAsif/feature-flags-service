@@ -10,7 +10,10 @@ namespace Infrastructure.Repositories;
 // Local: 4 hours (API keys rarely change)
 // Distributed: 24 hours
 // Background operations enabled for write-through caching
-public sealed class CachedApiKeyRepository(IApiKeyRepository innerRepository, IFusionCache cache, ApiKeyUsageQueue usageQueue)
+public sealed class CachedApiKeyRepository(
+    IApiKeyRepository innerRepository,
+    IFusionCache cache,
+    ApiKeyUsageQueue usageQueue)
     : IApiKeyRepository
 {
     private static readonly FusionCacheEntryOptions CacheOptions = new()
@@ -34,7 +37,7 @@ public sealed class CachedApiKeyRepository(IApiKeyRepository innerRepository, IF
             CacheOptions,
             cancellationToken);
     }
-    
+
     // Get API key by hash with caching
     // This is the hot path for authentication - called on pretty much every request
     public async Task<ApiKey?> GetByKeyHashAsync(string keyHash, CancellationToken cancellationToken = default)

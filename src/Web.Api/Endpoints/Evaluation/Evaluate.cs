@@ -35,7 +35,7 @@ public class Evaluate : IEndpoint
                             UserId = userId ?? "anonymous",
                             Groups = groups is null ? [] : ParseGroups(groups)
                         };
-                        
+
                         var result = await evaluationService.EvaluateAsync(projectId.Value, featureFlagKey, context);
                         return Results.Json(result, ApiJsonContext.Default.EvaluationResponse);
                     }
@@ -88,7 +88,7 @@ public class Evaluate : IEndpoint
             if (groupSpan.IsEmpty) continue;
             // Only allocate string here
             var group = groupSpan.ToString().ToUpperInvariant();
-            
+
             if (!result.Contains(group))
                 result.Add(group);
         }

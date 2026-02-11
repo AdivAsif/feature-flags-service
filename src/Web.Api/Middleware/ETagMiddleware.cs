@@ -13,7 +13,7 @@ public class ETagMiddleware(RequestDelegate next)
     {
         // Avoid buffering/hashing for the hot-path evaluation endpoint
         // Evaluation responses are user-context dependent and don't need ETags, and buffering would add unnecessary overhead
-        if (context.Request.Path.StartsWithSegments(EvaluationPathPrefix) || 
+        if (context.Request.Path.StartsWithSegments(EvaluationPathPrefix) ||
             context.Request.Path.StartsWithSegments(EvaluationV1PathPrefix))
         {
             await next(context);

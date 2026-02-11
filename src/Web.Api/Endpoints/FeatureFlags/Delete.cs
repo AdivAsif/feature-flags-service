@@ -21,7 +21,7 @@ public class Delete : IEndpoint
                         logger.LogWarning("Request missing projectId claim");
                         return Results.Unauthorized();
                     }
-                    
+
                     var performedByUserId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ??
                                             httpContext.User.FindFirstValue("sub");
                     var performedByUserEmail = httpContext.User.FindFirstValue(ClaimTypes.Email) ??

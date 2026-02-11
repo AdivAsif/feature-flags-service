@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Application.Interfaces.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -15,7 +14,6 @@ public sealed class ApiKeyUsageBackgroundService(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await foreach (var apiKeyId in queue.Reader.ReadAllAsync(stoppingToken))
-        {
             try
             {
                 using var scope = serviceProvider.CreateScope();
@@ -27,6 +25,5 @@ public sealed class ApiKeyUsageBackgroundService(
                 logger.LogError(ex,
                     "Error updating LastUsedAt for ApiKeyId: {ApiKeyId}", apiKeyId);
             }
-        }
     }
 }

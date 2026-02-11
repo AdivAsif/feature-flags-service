@@ -53,7 +53,8 @@ public class FeatureFlagHub(ILogger<FeatureFlagHub> logger) : Hub
         catch (Exception ex)
         {
             logger.LogError(ex, "Error during OnConnectedAsync for connection {ConnectionId}", Context.ConnectionId);
-             await Clients.Caller.SendAsync("SubscriptionFailed", "An error occurred while subscribing to project updates.");
+            await Clients.Caller.SendAsync("SubscriptionFailed",
+                "An error occurred while subscribing to project updates.");
         }
 
         await base.OnConnectedAsync();

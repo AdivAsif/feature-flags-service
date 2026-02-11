@@ -87,11 +87,9 @@ public class ApiKeyAuthenticationHandler(
             var apiKeyEntity = await apiKeyRepository.GetByKeyHashAsync(keyHash, Context.RequestAborted);
 
             if (apiKeyEntity == null)
-            {
                 // We return NoResult here instead of Fail to allow other authentication handlers (like JwtBearer) to
                 // attempt authentication if this wasn't a valid API key
                 return AuthenticateResult.NoResult();
-            }
 
             // Check expiration
             if (apiKeyEntity.ExpiresAt.HasValue && apiKeyEntity.ExpiresAt.Value < DateTimeOffset.UtcNow)

@@ -3,7 +3,6 @@ using Domain;
 using FluentAssertions;
 using Infrastructure.Repositories;
 using Infrastructure.Services;
-using Microsoft.Extensions.Logging;
 using NSubstitute;
 using ZiggyCreatures.Caching.Fusion;
 

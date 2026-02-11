@@ -2,34 +2,6 @@ import http from 'k6/http';
 import {check} from 'k6';
 import {Counter, Rate, Trend} from 'k6/metrics';
 
-// Steady-state evaluation load test.
-// Goal: measure sustainable RPS (and RPS/core) without polluting results with provisioning traffic.
-//
-// Key features:
-// - Uses static naming (project_a, api_key_a, flag_a_xxx) instead of timestamps
-// - Idempotent setup: reuses existing resources across runs for realistic caching
-// - Two-phase execution: warmup scenario (populate cache) + measurement scenario (collect metrics)
-// - Metrics (p99, etc.) only collected from warmed measurement phase, not cold startup
-//
-// Default behavior:
-// - setup() provisions/reuses minimal dataset (1 project + 1 api key + N flags)
-// - warmup scenario runs first to populate cache (30s @ 1000 RPS by default)
-// - measurement scenario runs after warmup with actual load (2m @ 12000 RPS by default)
-//
-// Optional (skip provisioning):
-// - API_KEY: an existing X-Api-Key
-// - FLAG_KEYS: comma-separated existing flag keys
-//
-// Common env:
-// - BASE_URL=http://api:8080
-// - RATE=10000 (measurement phase rate)
-// - DURATION=2m (measurement phase duration)
-// - WARMUP_DURATION=30s
-// - WARMUP_RATE=1000
-// - PRE_ALLOCATED_VUS=200
-// - MAX_VUS=800
-// - PROJECT_NAME_PREFIX=project (results in project_a, project_b, etc.)
-
 const evaluationRequests = new Counter('evaluation_requests');
 const evaluationErrors = new Rate('evaluation_errors');
 const evaluationDuration = new Trend('evaluation_duration');

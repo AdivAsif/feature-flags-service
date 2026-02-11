@@ -16,7 +16,6 @@ public sealed class ApiKeyUsageCleanupService(
         using var timer = new PeriodicTimer(CleanupInterval);
 
         while (await timer.WaitForNextTickAsync(stoppingToken))
-        {
             try
             {
                 queue.CleanupOldEntries();
@@ -25,6 +24,5 @@ public sealed class ApiKeyUsageCleanupService(
             {
                 logger.LogError(ex, "Error during API key usage cleanup");
             }
-        }
     }
 }

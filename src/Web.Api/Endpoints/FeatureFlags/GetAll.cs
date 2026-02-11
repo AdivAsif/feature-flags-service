@@ -22,6 +22,7 @@ public class GetAll : IEndpoint
                     logger.LogWarning("Request missing projectId claim");
                     return Results.Unauthorized();
                 }
+
                 var slice = await featureFlagsService.GetPagedAsync(projectId.Value, first, after, before);
 
                 return Results.Ok(slice.ToPagedResult());
