@@ -1,0 +1,14 @@
+namespace FeatureFlags.Client;
+
+public sealed class ApiKey : DtoBase
+{
+    public Guid ProjectId { get; init; }
+    public string KeyPrefix { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public string Scopes { get; init; } = string.Empty;
+    public DateTimeOffset? ExpiresAt { get; init; }
+    public DateTimeOffset? LastUsedAt { get; init; }
+    public string CreatedByUserId { get; init; } = string.Empty;
+    public DateTimeOffset? RevokedAt { get; init; }
+    public bool IsActive { get; init; } = true;
+}
