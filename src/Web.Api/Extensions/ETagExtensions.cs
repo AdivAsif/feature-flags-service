@@ -6,7 +6,7 @@ namespace Web.Api.Extensions;
 
 public static class ETagExtensions
 {
-    public static string GenerateETag(this FeatureFlagDTO featureFlag)
+    public static string GenerateETag(this FeatureFlagDto featureFlag)
     {
         var versionString = $"{featureFlag.Id}-{featureFlag.Version}";
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(versionString));

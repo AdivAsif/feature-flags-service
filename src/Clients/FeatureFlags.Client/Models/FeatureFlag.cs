@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace FeatureFlags.Client;
+namespace FeatureFlags.Client.Models;
 
 public sealed class FeatureFlag : DtoBase
 {

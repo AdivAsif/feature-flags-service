@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using Application.DTOs;
 using Application.Interfaces;
+using Application.Interfaces.Repositories;
 using Application.Services;
 using Asp.Versioning;
 using Domain;
@@ -13,15 +14,20 @@ using Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using Prometheus;
 using Scalar.AspNetCore;
 using Serilog;
 using SharedKernel;
+using StackExchange.Redis;
 using Web.Api.Extensions;
 using Web.Api.Middleware;
+using Web.Api.Services;
 using ZiggyCreatures.Caching.Fusion;
 using ZiggyCreatures.Caching.Fusion.Backplane.StackExchangeRedis;
 using ZiggyCreatures.Caching.Fusion.Serialization.SystemTextJson;
@@ -32,6 +38,8 @@ JwtSecurityTokenHandler.DefaultOutboundClaimTypeMap.Clear();
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Add services to the container.
+// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddProblemDetails();
 
 builder.Services.AddApiVersioning(options =>
@@ -41,8 +49,6 @@ builder.Services.AddApiVersioning(options =>
     options.ReportApiVersions = true;
 });
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 var logger = new LoggerConfiguration()
     .CreateLogger();
 
@@ -83,73 +89,114 @@ builder.Services.AddOpenApi(options =>
         return Task.CompletedTask;
     });
 });
-builder.Services.AddNpgsql<FeatureFlagsDbContext>(builder.Configuration.GetConnectionString("FeatureFlagsDatabase") ??
-                                                  throw new InvalidOperationException(
-                                                      "Connection string 'FeatureFlagsDatabase' not found."));
-builder.Services.AddScoped<IKeyedRepository<FeatureFlag>, FeatureFlagsRepository>();
+
+builder.Services.AddPooledDbContextFactory<FeatureFlagsDbContext>(options =>
+{
+    options.UseNpgsql(builder.Configuration.GetConnectionString("FeatureFlagsDatabase") ??
+                      throw new InvalidOperationException(
+                          "Connection string 'FeatureFlagsDatabase' not found."),
+        npgsql =>
+        {
+            npgsql.CommandTimeout(5);
+            npgsql.MaxBatchSize(1);
+        });
+
+    options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
+});
+
+// Register base repositories
+builder.Services.AddScoped<IFeatureFlagRepository, FeatureFlagsRepository>();
 builder.Services.AddScoped<IRepository<AuditLog>, AuditLogsRepository>();
-builder.Services.AddScoped<ProjectRepository>();
+builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
 builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
-builder.Services.AddScoped<CachedApiKeyRepository>();
-builder.Services.AddScoped<IProjectService, ProjectService>();
-builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
+
+// Register cached repositories and services as decorators
+builder.Services.Decorate<IFeatureFlagRepository, CachedFeatureFlagRepository>();
+builder.Services.Decorate<IProjectRepository, CachedProjectRepository>();
+builder.Services.Decorate<IApiKeyRepository, CachedApiKeyRepository>();
+builder.Services.Decorate<IEvaluationService, CachedEvaluationService>();
+
 builder.Services.AddSingleton<ApiKeyUsageQueue>();
 builder.Services.AddHostedService<ApiKeyUsageBackgroundService>();
 builder.Services.AddSingleton<FeatureFlagMapper>();
 builder.Services.AddSingleton<AuditLogMapper>();
+builder.Services.AddScoped<IProjectService, ProjectService>();
+builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
 builder.Services.AddScoped<IFeatureFlagsService, FeatureFlagsService>();
 builder.Services.AddScoped<IEvaluationService, EvaluationService>();
 builder.Services.AddScoped<IAuditLogsService, AuditLogsService>();
 builder.Services.AddSingleton<AuditLogQueue>();
 builder.Services.AddHostedService<AuditLogBackgroundService>();
+builder.Services.AddSingleton<CacheMetricsService>();
+builder.Services.AddHostedService<CacheStatsService>();
 builder.Services.AddEndpoints(typeof(Program).Assembly);
 
-// Decorate repositories with caching using Scrutor
-builder.Services.Decorate<IKeyedRepository<FeatureFlag>, CachedKeyedRepository<FeatureFlag>>();
-builder.Services.Decorate<IApiKeyRepository, CachedApiKeyRepository>();
+builder.Services.AddMemoryCache(options =>
+{
+    // Configure L1 memory cache size for ~25,000 entries at peak
+    // Assuming average entry size of ~2KB: 25,000 * 2KB = 50MB
+    // Set to 100MB to provide headroom and prevent churning
+    options.SizeLimit = 50000; // ~100MB with 2KB entries
 
-builder.Services.AddMemoryCache();
+    // Compact 25% when memory pressure detected
+    options.CompactionPercentage = 0.25;
+});
+
+var redisCache = new RedisCache(new RedisCacheOptions
+{
+    Configuration = builder.Configuration.GetConnectionString("FeatureFlagsCache")
+                    ?? throw new InvalidOperationException("Connection string 'FeatureFlagsCache' not found."),
+
+    ConfigurationOptions = new ConfigurationOptions
+    {
+        EndPoints = { builder.Configuration.GetConnectionString("FeatureFlagsCache")! },
+        AbortOnConnectFail = false,
+        ConnectTimeout = 1000,
+        SyncTimeout = 1000,
+        AsyncTimeout = 1000,
+        ConnectRetry = 3,
+        KeepAlive = 60
+    }
+});
+var instrumentedRedisCache = new MetricsDistributedCache(redisCache);
+
 builder.Services.AddFusionCache()
     .WithOptions(options =>
     {
         options.DistributedCacheCircuitBreakerDuration = TimeSpan.FromSeconds(2);
-
-        options.FailSafeActivationLogLevel = LogLevel.Debug;
+        options.FailSafeActivationLogLevel = LogLevel.Information;
         options.SerializationErrorsLogLevel = LogLevel.Warning;
         options.DistributedCacheSyntheticTimeoutsLogLevel = LogLevel.Debug;
         options.DistributedCacheErrorsLogLevel = LogLevel.Error;
         options.FactorySyntheticTimeoutsLogLevel = LogLevel.Debug;
         options.FactoryErrorsLogLevel = LogLevel.Error;
+
+        options.EnableSyncEventHandlersExecution = true;
     })
     .WithDefaultEntryOptions(new FusionCacheEntryOptions
     {
-        Duration = TimeSpan.FromMinutes(1),
+        Duration = TimeSpan.FromMinutes(5),
+        DistributedCacheDuration = TimeSpan.FromHours(1),
 
         IsFailSafeEnabled = true,
         FailSafeMaxDuration = TimeSpan.FromHours(2),
         FailSafeThrottleDuration = TimeSpan.FromSeconds(30),
 
-        EagerRefreshThreshold = 0.9f,
+        EagerRefreshThreshold = 0.8f,
 
-        FactorySoftTimeout = TimeSpan.FromMilliseconds(100),
-        FactoryHardTimeout = TimeSpan.FromMilliseconds(1500),
+        FactorySoftTimeout = TimeSpan.FromMilliseconds(10),
+        FactoryHardTimeout = TimeSpan.FromMilliseconds(50),
 
-        DistributedCacheSoftTimeout = TimeSpan.FromSeconds(1),
-        DistributedCacheHardTimeout = TimeSpan.FromSeconds(2),
+        DistributedCacheSoftTimeout = TimeSpan.FromMilliseconds(100),
+        DistributedCacheHardTimeout = TimeSpan.FromMilliseconds(500),
+
         AllowBackgroundDistributedCacheOperations = true,
-
-        JitterMaxDuration = TimeSpan.FromSeconds(2)
+        Size = 1,
+        JitterMaxDuration = TimeSpan.FromMilliseconds(100)
     })
     .WithSerializer(
         new FusionCacheSystemTextJsonSerializer())
-    .WithDistributedCache(
-        new RedisCache(new RedisCacheOptions
-        {
-            Configuration = builder.Configuration.GetConnectionString("FeatureFlagsCache") ??
-                            throw new InvalidOperationException(
-                                "Connection string 'FeatureFlagsCache' not found.")
-        })
-    )
+    .WithDistributedCache(instrumentedRedisCache)
     .WithBackplane(
         new RedisBackplane(new RedisBackplaneOptions
         {
@@ -163,23 +210,16 @@ builder.Services.AddJwtBearerAuthentication(builder.Configuration);
 builder.Services.AddApiKeyAuthentication();
 
 // Configure authorization policies
-builder.Services.AddAuthorization(options =>
-{
-    // Default policy - accepts both JWT and API Key authentication
-    options.DefaultPolicy = new AuthorizationPolicyBuilder()
+builder.Services.AddAuthorizationBuilder()
+    // Configure authorization policies
+    .SetDefaultPolicy(new AuthorizationPolicyBuilder()
         .AddAuthenticationSchemes(
             JwtBearerDefaults.AuthenticationScheme,
             ApiKeyAuthenticationOptions.DefaultScheme)
         .RequireAuthenticatedUser()
-        .Build();
-
-    // ========================================
-    // Management Policies (JWT Only)
-    // Used for project and API key management
-    // ========================================
-
-    // Admin-only policy - for creating/managing projects and API keys
-    options.AddPolicy("Admin", policy =>
+        .Build())
+    // Configure authorization policies
+    .AddPolicy("Admin", policy =>
     {
         policy.AddAuthenticationSchemes(JwtBearerDefaults
             .AuthenticationScheme);
@@ -187,38 +227,25 @@ builder.Services.AddAuthorization(options =>
         {
             // Check for role claim in any format (short or XML URI)
             var hasAdminRole = context.User.HasClaim(c =>
-                (c.Type == "role" || c.Type == ClaimTypes.Role) && c.Value == "admin");
-
-            var logger = context.Resource as HttpContext;
-            logger?.RequestServices.GetService<ILogger<Program>>()?.LogWarning(
-                "Admin policy check: HasAdminRole={HasRole}, Claims={Claims}",
-                hasAdminRole,
-                string.Join(", ", context.User.Claims.Select(c => $"{c.Type}={c.Value}")));
+                c.Type is "role" or ClaimTypes.Role && c.Value == "admin");
             return hasAdminRole;
         });
-    });
-
-    // User policy - for viewing projects and API keys
-    options.AddPolicy("User", policy =>
+    })
+    // Configure authorization policies
+    .AddPolicy("User", policy =>
     {
         policy.AddAuthenticationSchemes(JwtBearerDefaults
             .AuthenticationScheme);
         policy.RequireAssertion(context =>
         {
             var hasUserRole = context.User.HasClaim(c =>
-                (c.Type == "role" || c.Type == ClaimTypes.Role) &&
-                (c.Value == "user" || c.Value == "admin"));
+                c.Type is "role" or ClaimTypes.Role &&
+                c.Value is "user" or "admin");
             return hasUserRole;
         });
-    });
-
-    // ========================================
-    // Feature Flag Policies (JWT or API Key)
-    // Used for feature flag CRUD operations
-    // ========================================
-
-    // Read access - API Key with flags:read scope OR JWT with user/admin role
-    options.AddPolicy("ReadAccess", policy =>
+    })
+    // Configure authorization policies
+    .AddPolicy("ReadAccess", policy =>
     {
         policy.AddAuthenticationSchemes(
             JwtBearerDefaults.AuthenticationScheme,
@@ -235,10 +262,9 @@ builder.Services.AddAuthorization(options =>
 
             return hasReadScope || isUser || isAdmin;
         });
-    });
-
-    // Write access - API Key with flags:write scope OR JWT with admin role
-    options.AddPolicy("WriteAccess", policy =>
+    })
+    // Configure authorization policies
+    .AddPolicy("WriteAccess", policy =>
     {
         policy.AddAuthenticationSchemes(
             JwtBearerDefaults.AuthenticationScheme,
@@ -254,10 +280,9 @@ builder.Services.AddAuthorization(options =>
 
             return hasWriteScope || isAdmin;
         });
-    });
-
-    // Delete access - API Key with flags:delete scope OR JWT with admin role
-    options.AddPolicy("DeleteAccess", policy =>
+    })
+    // Configure authorization policies
+    .AddPolicy("DeleteAccess", policy =>
     {
         policy.AddAuthenticationSchemes(
             JwtBearerDefaults.AuthenticationScheme,
@@ -273,25 +298,27 @@ builder.Services.AddAuthorization(options =>
 
             return hasDeleteScope || isAdmin;
         });
-    });
-
-    // ========================================
-    // Evaluation Policy (API Key Only)
-    // Used for flag evaluation endpoint
-    // ========================================
-
-    // Evaluation access - API Key only (not for human users)
-    options.AddPolicy("EvaluateAccess", policy =>
+    })
+    // Configure authorization policies
+    .AddPolicy("EvaluateAccess", policy =>
     {
         policy.AddAuthenticationSchemes(ApiKeyAuthenticationOptions.DefaultScheme);
         policy.RequireAssertion(context =>
             context.User.HasClaim(c =>
                 c.Type == "scope" && c.Value.Split(' ').Contains("flags:read")));
     });
-});
 builder.Services.AddHealthChecks();
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing => tracing.AddFusionCacheInstrumentation())
+    .WithMetrics(metrics => metrics.AddFusionCacheInstrumentation());
+builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 
 var app = builder.Build();
+
+// Attach cache metrics monitoring
+var cacheMetricsService = app.Services.GetRequiredService<CacheMetricsService>();
+var fusionCache = app.Services.GetRequiredService<IFusionCache>();
+cacheMetricsService.AttachToCache(fusionCache);
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -328,15 +355,14 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapHealthChecks("/health");
+// Prometheus metrics endpoint - this is before the Authorization and Middleware registrations to make sure prometheus metrics are more accurate
+app.MapMetrics();
+app.UseHttpMetrics();
+
 app.UseAuthentication();
 app.UseHttpsRedirection();
 app.UseAuthorization();
-
 app.UseMiddleware<ETagMiddleware>();
-
-// Prometheus metrics endpoint
-app.UseHttpMetrics();
-app.MapMetrics();
 
 var api = app.NewVersionedApi();
 var v1 = api.MapGroup("/api").HasApiVersion(new ApiVersion(1, 0));

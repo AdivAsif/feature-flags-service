@@ -5,7 +5,7 @@ namespace Web.Api.Extensions;
 
 public static class JwtBearerConfiguration
 {
-    public static IServiceCollection AddJwtBearerAuthentication(this IServiceCollection services,
+    public static void AddJwtBearerAuthentication(this IServiceCollection services,
         IConfiguration configuration)
     {
         services.AddAuthentication()
@@ -47,7 +47,5 @@ public static class JwtBearerConfiguration
                 //     }
                 // };
             });
-
-        return services;
     }
 }

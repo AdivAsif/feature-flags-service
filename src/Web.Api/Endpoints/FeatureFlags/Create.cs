@@ -11,7 +11,7 @@ public class Create : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPost("/feature-flags",
-            async (FeatureFlagDTO featureFlag, HttpContext httpContext, ClaimsPrincipal user,
+            async (FeatureFlagDto featureFlag, HttpContext httpContext, ClaimsPrincipal user,
                 IFeatureFlagsService featureFlagsService,
                 ILogger<Create> logger) =>
             {
@@ -24,7 +24,7 @@ public class Create : IEndpoint
                         return Results.Unauthorized();
                     }
 
-                    logger.LogInformation("Creating feature flag with key: {Key} for project: {ProjectId}",
+                    logger.LogDebug("Creating feature flag with key: {Key} for project: {ProjectId}",
                         featureFlag.Key, projectId);
                     var performedByUserId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ??
                                             httpContext.User.FindFirstValue("sub");

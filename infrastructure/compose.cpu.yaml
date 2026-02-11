@@ -1,0 +1,28 @@
+services:
+  api:
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
+          cpus: "2.0"
+          memory: 2G
+    cpuset: "0-1"
+  
+  k6:
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 8G
+        reservations:
+          cpus: "4.0"
+          memory: 4G
+    cpuset: "8-11"
+  
+  postgres:
+    cpuset: "2-3"
+  
+  redis:
+    cpuset: "4-5"

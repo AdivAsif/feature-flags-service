@@ -13,7 +13,7 @@ public class GetById : IEndpoint
                 {
                     try
                     {
-                        logger.LogInformation("Getting audit log by id: {ID}", id);
+                        logger.LogDebug("Getting audit log by id: {ID}", id);
                         var auditLog = await auditLogsService.GetAsync(id);
 
                         return auditLog == null

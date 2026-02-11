@@ -15,7 +15,7 @@ public class Create : IEndpoint
             {
                 try
                 {
-                    logger.LogInformation("Creating API key for project: {ProjectId} with name: {Name}",
+                    logger.LogDebug("Creating API key for project: {ProjectId} with name: {Name}",
                         projectId, createApiKeyDto.Name);
 
                     var createdByUserId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ??

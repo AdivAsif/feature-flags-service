@@ -11,7 +11,7 @@ public class Update : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPatch("/feature-flags/{key}",
-            async (string key, FeatureFlagDTO featureFlag, HttpContext httpContext, ClaimsPrincipal user,
+            async (string key, FeatureFlagDto featureFlag, HttpContext httpContext, ClaimsPrincipal user,
                 IFeatureFlagsService featureFlagsService, ILogger<Update> logger) =>
             {
                 try
@@ -23,7 +23,7 @@ public class Update : IEndpoint
                         return Results.Unauthorized();
                     }
 
-                    logger.LogInformation("Updating feature flag with key: {Key} for project: {ProjectId}", key,
+                    logger.LogDebug("Updating feature flag with key: {Key} for project: {ProjectId}", key,
                         projectId);
 
                     // Get the current feature flag to validate ETag

@@ -2,50 +2,41 @@
 using Application.DTOs;
 using Application.Exceptions;
 using Application.Interfaces;
+using Application.Interfaces.Repositories;
 using Domain;
-using SharedKernel;
 
 namespace Application.Services;
 
 public sealed class FeatureFlagsService(
-    IKeyedRepository<FeatureFlag> featureFlagRepository,
+    IFeatureFlagRepository featureFlagRepository,
     FeatureFlagMapper mapper,
     AuditLogQueue auditLogQueue)
     : IFeatureFlagsService
 {
-    public async Task<FeatureFlagDTO?> GetAsync(Guid projectId, Guid id)
+    public async Task<FeatureFlagDto?> GetAsync(Guid projectId, Guid id, CancellationToken cancellationToken = default)
     {
-        // For now, use the base interface method
-        var featureFlag = await featureFlagRepository.GetByIdAsync(id);
-        if (featureFlag == null || featureFlag.ProjectId != projectId)
-            throw new NotFoundException($"Feature Flag with id: {id} not found in project: {projectId}");
-        return mapper.FeatureFlagToFeatureFlagDto(featureFlag);
+        var featureFlag = await featureFlagRepository.GetByIdAsync(projectId, id, cancellationToken);
+        return featureFlag == null
+            ? throw new NotFoundException($"Feature Flag with id: {id} not found in project: {projectId}")
+            : mapper.FeatureFlagToFeatureFlagDto(featureFlag);
     }
 
-    public async Task<FeatureFlagDTO?> GetByKeyAsync(Guid projectId, string key)
+    public async Task<FeatureFlagDto?> GetByKeyAsync(Guid projectId, string key,
+        CancellationToken cancellationToken = default)
     {
         // Use the project-filtered version of the repository method
-        var featureFlag = await featureFlagRepository.GetByKeyAsync(projectId, key);
-        if (featureFlag == null)
-            throw new NotFoundException($"Feature Flag with key: {key} not found in project: {projectId}");
-        return mapper.FeatureFlagToFeatureFlagDto(featureFlag);
+        var featureFlag = await featureFlagRepository.GetByKeyAsync(projectId, key, cancellationToken);
+        return featureFlag == null
+            ? throw new NotFoundException($"Feature Flag with key: {key} not found in project: {projectId}")
+            : mapper.FeatureFlagToFeatureFlagDto(featureFlag);
     }
 
-    public async Task<IEnumerable<FeatureFlagDTO>> GetAllAsync(Guid projectId, int? take = null, int? skip = null)
+    public async Task<PagedDto<FeatureFlagDto>> GetPagedAsync(Guid projectId, int first = 10, string? after = null,
+        string? before = null, CancellationToken cancellationToken = default)
     {
-        var allFlags = await featureFlagRepository.GetAllAsync(take, skip);
-        var projectFlags = allFlags.Where(ff => ff.ProjectId == projectId);
-        return mapper.FeatureFlagsToFeatureFlagDtos(projectFlags);
-    }
+        var pagedResult = await featureFlagRepository.GetPagedAsync(projectId, first, after, before, cancellationToken);
 
-    public async Task<PagedDto<FeatureFlagDTO>> GetPagedAsync(Guid projectId, int first = 10, string? after = null,
-        string? before = null)
-    {
-        // TODO: This needs to be optimized in Phase 4 with proper repository support
-        var pagedResult = await featureFlagRepository.GetPagedAsync(first, after, before);
-        var projectFlags = pagedResult.Items.Where(ff => ff.ProjectId == projectId);
-
-        return new PagedDto<FeatureFlagDTO>
+        return new PagedDto<FeatureFlagDto>
         {
             Items = mapper.FeatureFlagsToFeatureFlagDtos(pagedResult.Items),
             PageInfo = new PaginationInfo
@@ -59,26 +50,26 @@ public sealed class FeatureFlagsService(
         };
     }
 
-    public async Task<FeatureFlagDTO> CreateAsync(Guid projectId, FeatureFlagDTO featureFlag,
+    public async Task<FeatureFlagDto> CreateAsync(Guid projectId, FeatureFlagDto featureFlag,
         string? performedByUserId = null,
-        string? performedByUserEmail = null)
+        string? performedByUserEmail = null, CancellationToken cancellationToken = default)
     {
         if (featureFlag.Key == null) throw new BadRequestException("Feature Flag key is required");
 
         // Check if key exists in this project
-        var existing = await featureFlagRepository.GetByKeyAsync(projectId, featureFlag.Key);
+        var existing = await featureFlagRepository.GetByKeyAsync(projectId, featureFlag.Key, cancellationToken);
         if (existing != null)
             throw new BadRequestException(
                 $"Feature Flag with key: {featureFlag.Key} already exists in project: {projectId}");
 
         var entityToCreate = mapper.FeatureFlagDtoToFeatureFlag(featureFlag);
         entityToCreate.ProjectId = projectId;
-        var created = await featureFlagRepository.CreateAsync(entityToCreate);
+        var created = await featureFlagRepository.CreateAsync(entityToCreate, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(performedByUserId) && string.IsNullOrWhiteSpace(performedByUserEmail))
             return mapper.FeatureFlagToFeatureFlagDto(created);
 
-        var auditLog = new AuditLogDTO
+        var auditLog = new AuditLogDto
         {
             Action = AuditLogAction.Create,
             FeatureFlagId = created.Id,
@@ -87,17 +78,18 @@ public sealed class FeatureFlagsService(
             PerformedByUserId = performedByUserId ?? string.Empty,
             PerformedByUserEmail = performedByUserEmail ?? string.Empty
         };
-        _ = auditLogQueue.QueueAuditLogAsync(auditLog);
+        _ = auditLogQueue.QueueAuditLogAsync(auditLog, cancellationToken);
 
         return mapper.FeatureFlagToFeatureFlagDto(created);
     }
 
-    public async Task<FeatureFlagDTO> UpdateAsync(Guid projectId, string key, FeatureFlagDTO featureFlag,
-        string? performedByUserId = null, string? performedByUserEmail = null)
+    public async Task<FeatureFlagDto> UpdateAsync(Guid projectId, string key, FeatureFlagDto featureFlag,
+        string? performedByUserId = null, string? performedByUserEmail = null,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(key)) throw new BadRequestException("Feature Flag key is required");
 
-        var featureFlagFromDb = await featureFlagRepository.GetByKeyAsync(projectId, key);
+        var featureFlagFromDb = await featureFlagRepository.GetByKeyAsync(projectId, key, cancellationToken);
         if (featureFlagFromDb == null)
             throw new NotFoundException($"Feature Flag with key: {featureFlag.Key} not found in project: {projectId}");
 
@@ -114,12 +106,12 @@ public sealed class FeatureFlagsService(
         featureFlagFromDb.Version++;
         featureFlagFromDb.UpdatedAt = DateTime.UtcNow;
 
-        var updated = await featureFlagRepository.UpdateAsync(featureFlagFromDb);
+        var updated = await featureFlagRepository.UpdateAsync(featureFlagFromDb, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(performedByUserId) && string.IsNullOrWhiteSpace(performedByUserEmail))
             return mapper.FeatureFlagToFeatureFlagDto(updated);
 
-        var auditLog = new AuditLogDTO
+        var auditLog = new AuditLogDto
         {
             FeatureFlagId = featureFlagFromDb.Id,
             Action = AuditLogAction.Update,
@@ -129,21 +121,21 @@ public sealed class FeatureFlagsService(
             PerformedByUserId = performedByUserId ?? string.Empty,
             PerformedByUserEmail = performedByUserEmail ?? string.Empty
         };
-        _ = auditLogQueue.QueueAuditLogAsync(auditLog);
+        _ = auditLogQueue.QueueAuditLogAsync(auditLog, cancellationToken);
 
         return mapper.FeatureFlagToFeatureFlagDto(updated);
     }
 
     public async Task DeleteByKeyAsync(Guid projectId, string key, string? performedByUserId = null,
-        string? performedByUserEmail = null)
+        string? performedByUserEmail = null, CancellationToken cancellationToken = default)
     {
-        var featureFlag = await featureFlagRepository.GetByKeyAsync(projectId, key);
+        var featureFlag = await featureFlagRepository.GetByKeyAsync(projectId, key, cancellationToken);
         if (featureFlag == null)
             throw new NotFoundException($"Feature Flag with key: {key} not found in project: {projectId}");
-        await featureFlagRepository.DeleteAsync(featureFlag.Id);
+        await featureFlagRepository.DeleteAsync(projectId, featureFlag.Id, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(performedByUserId) && string.IsNullOrWhiteSpace(performedByUserEmail)) return;
-        var auditLog = new AuditLogDTO
+        var auditLog = new AuditLogDto
         {
             Action = AuditLogAction.Delete,
             FeatureFlagId = featureFlag.Id,
@@ -152,6 +144,6 @@ public sealed class FeatureFlagsService(
             PerformedByUserId = performedByUserId ?? string.Empty,
             PerformedByUserEmail = performedByUserEmail ?? string.Empty
         };
-        _ = auditLogQueue.QueueAuditLogAsync(auditLog);
+        _ = auditLogQueue.QueueAuditLogAsync(auditLog, cancellationToken);
     }
 }

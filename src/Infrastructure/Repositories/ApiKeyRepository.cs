@@ -1,64 +1,78 @@
+using Application.Interfaces.Repositories;
 using Domain;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
 
-public class ApiKeyRepository : IApiKeyRepository
+public class ApiKeyRepository(IDbContextFactory<FeatureFlagsDbContext> contextFactory)
+    : BaseRepository<FeatureFlagsDbContext>(contextFactory), IApiKeyRepository
 {
-    private readonly FeatureFlagsDbContext _context;
-
-    public ApiKeyRepository(FeatureFlagsDbContext context)
+    // GET
+    public Task<ApiKey?> GetByIdAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
     {
-        _context = context;
+        return ExecuteAsync(db => db.ApiKeys
+            .AsNoTracking()
+            .FirstOrDefaultAsync(k => k.Id == apiKeyId, cancellationToken), cancellationToken);
     }
 
-    public async Task<ApiKey?> GetByIdAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
+    public Task<ApiKey?> GetByKeyHashAsync(string keyHash, CancellationToken cancellationToken = default)
     {
-        return await _context.ApiKeys
-            .AsNoTracking()
-            .FirstOrDefaultAsync(k => k.Id == apiKeyId, cancellationToken);
-    }
-
-    public async Task<ApiKey?> GetByKeyHashAsync(string keyHash, CancellationToken cancellationToken = default)
-    {
-        return await _context.ApiKeys
-            .AsNoTracking()
-            .FirstOrDefaultAsync(k => k.KeyHash == keyHash && k.IsActive && k.RevokedAt == null, cancellationToken);
+        return ExecuteAsync(async db => await db.ApiKeys
+                .AsNoTracking()
+                .Select(k => new ApiKey
+                {
+                    Id = k.Id,
+                    ProjectId = k.ProjectId,
+                    IsActive = k.IsActive,
+                    KeyHash = k.KeyHash,
+                    RevokedAt = k.RevokedAt,
+                    Scopes = k.Scopes,
+                    ExpiresAt = k.ExpiresAt,
+                    Name = k.Name
+                })
+                .FirstOrDefaultAsync(k => k.KeyHash == keyHash && k.IsActive && k.RevokedAt == null, cancellationToken),
+            cancellationToken);
     }
 
     public async Task<IEnumerable<ApiKey>> GetByProjectIdAsync(Guid projectId,
         CancellationToken cancellationToken = default)
     {
-        return await _context.ApiKeys
+        return await ExecuteAsync(async db => await db.ApiKeys
             .AsNoTracking()
             .Where(k => k.ProjectId == projectId && k.IsActive)
             .OrderByDescending(k => k.CreatedAt)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken), cancellationToken);
     }
 
-    public async Task<ApiKey> CreateAsync(ApiKey apiKey, CancellationToken cancellationToken = default)
+    // CREATE
+    public Task<ApiKey> CreateAsync(ApiKey apiKey, CancellationToken cancellationToken = default)
     {
-        _context.ApiKeys.Add(apiKey);
-        await _context.SaveChangesAsync(cancellationToken);
-        return apiKey;
+        return ExecuteAsync(async db =>
+        {
+            await db.ApiKeys.AddAsync(apiKey, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            return apiKey;
+        }, cancellationToken);
     }
 
-    public async Task RevokeAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
+    // UPDATE
+    public Task RevokeAsync(Guid apiKeyId, CancellationToken cancellationToken = default) // (soft-delete)
     {
-        await _context.ApiKeys
-            .Where(k => k.Id == apiKeyId)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(k => k.RevokedAt, DateTimeOffset.UtcNow)
-                .SetProperty(k => k.IsActive, false)
-                .SetProperty(k => k.UpdatedAt, DateTimeOffset.UtcNow), cancellationToken);
+    return ExecuteAsync(async db => await db.ApiKeys
+        .Where(k => k.Id == apiKeyId)
+        .ExecuteUpdateAsync(setters => setters
+            .SetProperty(k => k.RevokedAt, DateTimeOffset.UtcNow)
+            .SetProperty(k => k.IsActive, false)
+            .SetProperty(k => k.UpdatedAt, DateTimeOffset.UtcNow), cancellationToken), cancellationToken);
     }
 
-    public async Task UpdateLastUsedAtAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
+    public Task UpdateLastUsedAtAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
     {
-        await _context.ApiKeys
-            .Where(k => k.Id == apiKeyId)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(k => k.LastUsedAt, DateTimeOffset.UtcNow),
-                cancellationToken);
+        return ExecuteAsync(
+            async db => await db.ApiKeys
+                .Where(k => k.Id == apiKeyId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(k => k.LastUsedAt, DateTimeOffset.UtcNow),
+                    cancellationToken), cancellationToken);
     }
 }

@@ -11,7 +11,7 @@ public class ETagExtensionsTests
     public void GenerateETag_WithFeatureFlag_ShouldReturnValidETag()
     {
         // Arrange
-        var featureFlag = new FeatureFlagDTO
+        var featureFlag = new FeatureFlagDto
         {
             Id = Guid.Parse("3fa85f64-5717-4562-b3fc-2c963f66afa6"),
             Version = 1,
@@ -35,8 +35,8 @@ public class ETagExtensionsTests
     {
         // Arrange
         var id = Guid.NewGuid();
-        var flag1 = new FeatureFlagDTO { Id = id, Version = 1 };
-        var flag2 = new FeatureFlagDTO { Id = id, Version = 1 };
+        var flag1 = new FeatureFlagDto { Id = id, Version = 1 };
+        var flag2 = new FeatureFlagDto { Id = id, Version = 1 };
 
         // Act
         var etag1 = flag1.GenerateETag();
@@ -51,8 +51,8 @@ public class ETagExtensionsTests
     {
         // Arrange
         var id = Guid.NewGuid();
-        var flag1 = new FeatureFlagDTO { Id = id, Version = 1 };
-        var flag2 = new FeatureFlagDTO { Id = id, Version = 2 };
+        var flag1 = new FeatureFlagDto { Id = id, Version = 1 };
+        var flag2 = new FeatureFlagDto { Id = id, Version = 2 };
 
         // Act
         var etag1 = flag1.GenerateETag();
@@ -66,7 +66,7 @@ public class ETagExtensionsTests
     public void ValidateETag_WithMatchingETag_ShouldReturnTrue()
     {
         // Arrange
-        var featureFlag = new FeatureFlagDTO
+        var featureFlag = new FeatureFlagDto
         {
             Id = Guid.NewGuid(),
             Version = 1

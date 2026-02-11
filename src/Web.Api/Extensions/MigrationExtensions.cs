@@ -5,38 +5,42 @@ namespace Web.Api.Extensions;
 
 public static class MigrationExtensions
 {
-    public static async Task ApplyMigrationsAsync(this IServiceProvider serviceProvider)
+    extension(IServiceProvider serviceProvider)
     {
-        using var scope = serviceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<FeatureFlagsDbContext>();
+        public async Task ApplyMigrationsAsync(CancellationToken cancellationToken = default)
+        {
+            using var scope = serviceProvider.CreateScope();
+            var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<FeatureFlagsDbContext>>();
+            await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        try
-        {
-            await dbContext.Database.MigrateAsync();
-            Console.WriteLine("✓ Database migrations applied successfully");
+            try
+            {
+                await dbContext.Database.MigrateAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error applying migrations: {ex.Message}");
+                throw;
+            }
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"✗ Error applying migrations: {ex.Message}");
-            throw;
-        }
-    }
 
-    public static async Task SeedDatabaseAsync(this IServiceProvider serviceProvider)
-    {
-        using var scope = serviceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<FeatureFlagsDbContext>();
-        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-        var seeder = new DbSeeder(dbContext, configuration);
+        public async Task SeedDatabaseAsync(CancellationToken cancellationToken = default)
+        {
+            using var scope = serviceProvider.CreateScope();
+            var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<FeatureFlagsDbContext>>();
+            var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
 
-        try
-        {
-            await seeder.SeedAsync();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"✗ Error seeding database: {ex.Message}");
-            throw;
+            var seeder = new DbSeeder(dbContextFactory, configuration);
+
+            try
+            {
+                await seeder.SeedAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error seeding database: {ex.Message}");
+                throw;
+            }
         }
     }
 }

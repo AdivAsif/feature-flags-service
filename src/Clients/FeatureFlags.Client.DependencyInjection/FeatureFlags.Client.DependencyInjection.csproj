@@ -12,6 +12,8 @@
         <Description>Microsoft.Extensions.DependencyInjection helpers for FeatureFlags.Client.</Description>
         <PackageTags>feature-flags;featureflag;flags;toggle;sdk;di</PackageTags>
         <PackageReadmeFile>README.md</PackageReadmeFile>
+        <Configurations>Debug;Release;Production</Configurations>
+        <Platforms>AnyCPU</Platforms>
     </PropertyGroup>
 
     <ItemGroup>

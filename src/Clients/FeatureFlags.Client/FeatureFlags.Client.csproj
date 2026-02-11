@@ -12,6 +12,8 @@
         <Description>Lightweight .NET client SDK for the Feature Flags Service.</Description>
         <PackageTags>feature-flags;featureflag;flags;toggle;sdk</PackageTags>
         <PackageReadmeFile>README.md</PackageReadmeFile>
+        <Configurations>Debug;Release;Production</Configurations>
+        <Platforms>AnyCPU</Platforms>
     </PropertyGroup>
 
     <ItemGroup>

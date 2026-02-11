@@ -22,7 +22,7 @@ public class AuditLogQueueTests
     public async Task QueueAuditLogAsync_ShouldSuccessfullyQueueAuditLog()
     {
         // Arrange
-        var auditLog = new AuditLogDTO
+        var auditLog = new AuditLogDto
         {
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Create,
@@ -48,7 +48,7 @@ public class AuditLogQueueTests
     public async Task QueueAuditLogAsync_ShouldQueueMultipleAuditLogs()
     {
         // Arrange
-        var auditLog1 = new AuditLogDTO
+        var auditLog1 = new AuditLogDto
         {
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Create,
@@ -57,7 +57,7 @@ public class AuditLogQueueTests
             PerformedByUserId = "user1",
             PerformedByUserEmail = "user1@example.com"
         };
-        var auditLog2 = new AuditLogDTO
+        var auditLog2 = new AuditLogDto
         {
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Update,

@@ -5,89 +5,98 @@ using SharedKernel;
 
 namespace Infrastructure.Repositories;
 
-public class AuditLogsRepository(FeatureFlagsDbContext dbContext) : IRepository<AuditLog>
+public class AuditLogsRepository(IDbContextFactory<FeatureFlagsDbContext> contextFactory)
+    : BaseRepository<FeatureFlagsDbContext>(contextFactory), IRepository<AuditLog>
 {
     // GET
-    public async Task<AuditLog?> GetByIdAsync(Guid id)
+    public Task<AuditLog?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await dbContext.AuditLogs.FindAsync(id);
+        return ExecuteAsync(async db => await db.AuditLogs.FindAsync([id], cancellationToken),
+            cancellationToken);
     }
 
-    public async Task<IEnumerable<AuditLog>> GetAllAsync(int? take, int? skip)
+    public Task<PagedResult<AuditLog>> GetPagedAsync(int first = 10, string? after = null,
+        string? before = null, CancellationToken cancellationToken = default)
     {
-        return await dbContext.AuditLogs.AsNoTracking().ToListAsync();
-    }
-
-    public async Task<PagedResult<AuditLog>> GetPagedAsync(int first = 10, string? after = null,
-        string? before = null)
-    {
-        first = Math.Clamp(first, 1, 100);
-
-        var query = dbContext.AuditLogs.AsNoTracking().OrderBy(ff => ff.CreatedAt).ThenBy(ff => ff.Id);
-
-        if (!string.IsNullOrWhiteSpace(after) &&
-            CursorHelper.TryDecodeCursor(after, out var afterId, out var afterCreatedAt))
-            query = query
-                .Where(ff => ff.CreatedAt > afterCreatedAt || (ff.CreatedAt == afterCreatedAt && ff.Id > afterId))
-                .OrderBy(ff => ff.CreatedAt)
-                .ThenBy(ff => ff.Id);
-        else if (!string.IsNullOrWhiteSpace(before) &&
-                 CursorHelper.TryDecodeCursor(before, out var beforeId, out var beforeCreatedAt))
-            query = query
-                .Where(ff => ff.CreatedAt < beforeCreatedAt || (ff.CreatedAt == beforeCreatedAt && ff.Id < beforeId))
-                .OrderByDescending(ff => ff.CreatedAt)
-                .ThenByDescending(ff => ff.Id);
-
-        var items = await query.Take(first + 1).ToListAsync();
-
-        var hasNextPage = items.Count > first;
-        if (hasNextPage) items = items.Take(first).ToList();
-
-        if (!string.IsNullOrWhiteSpace(before)) items.Reverse();
-
-        var totalCount = await dbContext.AuditLogs.CountAsync();
-
-        var startCursor = items.Count > 0 ? CursorHelper.EncodeCursor(items.First().Id, items.First().CreatedAt) : null;
-        var endCursor = items.Count > 0 ? CursorHelper.EncodeCursor(items.Last().Id, items.Last().CreatedAt) : null;
-
-        var hasPreviousPage = !string.IsNullOrWhiteSpace(after) || (!string.IsNullOrWhiteSpace(before) && hasNextPage);
-
-        return new PagedResult<AuditLog>
+        return ExecuteAsync(async db =>
         {
-            Items = items,
-            PageInfo = new PageInfo
+            first = Math.Clamp(first, 1, 100);
+
+            var query = db.AuditLogs.AsNoTracking().OrderBy(al => al.CreatedAt).ThenBy(al => al.Id);
+
+            if (!string.IsNullOrWhiteSpace(after) &&
+                CursorHelper.TryDecodeCursor(after, out var afterId, out var afterCreatedAt))
+                query = query
+                    .Where(al => al.CreatedAt > afterCreatedAt || (al.CreatedAt == afterCreatedAt && al.Id > afterId))
+                    .OrderBy(al => al.CreatedAt)
+                    .ThenBy(al => al.Id);
+            else if (!string.IsNullOrWhiteSpace(before) &&
+                     CursorHelper.TryDecodeCursor(before, out var beforeId, out var beforeCreatedAt))
+                query = query
+                    .Where(al =>
+                        al.CreatedAt < beforeCreatedAt || (al.CreatedAt == beforeCreatedAt && al.Id < beforeId))
+                    .OrderByDescending(al => al.CreatedAt)
+                    .ThenByDescending(al => al.Id);
+
+            var items = await query.Take(first + 1).ToListAsync(cancellationToken);
+
+            var hasNextPage = items.Count > first;
+            if (hasNextPage) items = items.Take(first).ToList();
+
+            if (!string.IsNullOrWhiteSpace(before)) items.Reverse();
+
+            var totalCount = await db.AuditLogs.CountAsync(cancellationToken);
+
+            var startCursor = items.Count > 0
+                ? CursorHelper.EncodeCursor(items.First().Id, items.First().CreatedAt)
+                : null;
+            var endCursor = items.Count > 0 ? CursorHelper.EncodeCursor(items.Last().Id, items.Last().CreatedAt) : null;
+
+            var hasPreviousPage =
+                !string.IsNullOrWhiteSpace(after) || (!string.IsNullOrWhiteSpace(before) && hasNextPage);
+
+            return new PagedResult<AuditLog>
             {
-                HasNextPage = string.IsNullOrWhiteSpace(before) && hasNextPage,
-                HasPreviousPage = hasPreviousPage,
-                StartCursor = startCursor,
-                EndCursor = endCursor,
-                TotalCount = totalCount
-            }
-        };
+                Items = items,
+                PageInfo = new PageInfo
+                {
+                    HasNextPage = string.IsNullOrWhiteSpace(before) && hasNextPage,
+                    HasPreviousPage = hasPreviousPage,
+                    StartCursor = startCursor,
+                    EndCursor = endCursor,
+                    TotalCount = totalCount
+                }
+            };
+        }, cancellationToken);
     }
 
     // CREATE
-    public async Task<AuditLog> CreateAsync(AuditLog auditLog)
+    public Task<AuditLog> CreateAsync(AuditLog auditLog, CancellationToken cancellationToken = default)
     {
-        await dbContext.AuditLogs.AddAsync(auditLog);
-        await dbContext.SaveChangesAsync();
-        return auditLog;
+        return ExecuteAsync(async db =>
+        {
+            await db.AuditLogs.AddAsync(auditLog, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            return auditLog;
+        }, cancellationToken);
     }
 
-    // UPDATE
-    public async Task<AuditLog> UpdateAsync(AuditLog auditLog)
+    // UPDATE - not needed
+    public Task<AuditLog> UpdateAsync(AuditLog auditLog, CancellationToken cancellationToken = default)
     {
-        dbContext.Entry(auditLog).State = EntityState.Modified;
-        await dbContext.SaveChangesAsync();
-        return auditLog;
+        return ExecuteAsync(async db =>
+        {
+            db.Entry(auditLog).State = EntityState.Modified;
+            await db.SaveChangesAsync(cancellationToken);
+            return auditLog;
+        }, cancellationToken);
     }
 
     // DELETE
-    public async Task DeleteAsync(Guid id)
+    public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var auditLog = await dbContext.AuditLogs.FindAsync(id);
-        if (auditLog == null) return;
-        dbContext.AuditLogs.Remove(auditLog);
-        await dbContext.SaveChangesAsync();
+        return ExecuteAsync(async db => await db.AuditLogs
+            .Where(al => al.Id == id)
+            .ExecuteDeleteAsync(cancellationToken), cancellationToken);
     }
 }

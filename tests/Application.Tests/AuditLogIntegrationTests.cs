@@ -1,13 +1,13 @@
 using System.Diagnostics;
 using Application.DTOs;
 using Application.Interfaces;
+using Application.Interfaces.Repositories;
 using Application.Services;
 using Domain;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using SharedKernel;
 
 namespace Application.Tests;
 
@@ -19,13 +19,13 @@ public class AuditLogIntegrationTests
     public async Task FeatureFlagCreate_ShouldQueueAuditLogWithoutBlocking()
     {
         // Arrange
-        var repository = Substitute.For<IKeyedRepository<FeatureFlag>>();
+        var repository = Substitute.For<IFeatureFlagRepository>();
         var mapper = new FeatureFlagMapper();
         var queueLogger = Substitute.For<ILogger<AuditLogQueue>>();
         var queue = new AuditLogQueue(queueLogger);
         var featureFlagsService = new FeatureFlagsService(repository, mapper, queue);
 
-        var dto = new FeatureFlagDTO
+        var dto = new FeatureFlagDto
         {
             Key = "test-feature",
             Description = "Test feature",
@@ -67,7 +67,7 @@ public class AuditLogIntegrationTests
     public async Task FeatureFlagUpdate_ShouldQueueAuditLogWithoutBlocking()
     {
         // Arrange
-        var repository = Substitute.For<IKeyedRepository<FeatureFlag>>();
+        var repository = Substitute.For<IFeatureFlagRepository>();
         var mapper = new FeatureFlagMapper();
         var queueLogger = Substitute.For<ILogger<AuditLogQueue>>();
         var queue = new AuditLogQueue(queueLogger);
@@ -85,7 +85,7 @@ public class AuditLogIntegrationTests
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        var dto = new FeatureFlagDTO
+        var dto = new FeatureFlagDto
         {
             Key = key,
             Description = "Updated description",
@@ -121,7 +121,7 @@ public class AuditLogIntegrationTests
     public async Task FeatureFlagDelete_ShouldQueueAuditLogWithoutBlocking()
     {
         // Arrange
-        var repository = Substitute.For<IKeyedRepository<FeatureFlag>>();
+        var repository = Substitute.For<IFeatureFlagRepository>();
         var mapper = new FeatureFlagMapper();
         var queueLogger = Substitute.For<ILogger<AuditLogQueue>>();
         var queue = new AuditLogQueue(queueLogger);
@@ -147,7 +147,7 @@ public class AuditLogIntegrationTests
 
         // Assert - Feature flag deletion should be fast (not waiting for audit log)
         stopwatch.ElapsedMilliseconds.Should().BeLessThan(100);
-        await repository.Received(1).DeleteAsync(id);
+        await repository.Received(1).DeleteAsync(_testProjectId, id);
 
         // Verify audit log was queued
         var channel = queue.GetChannel();
@@ -162,7 +162,7 @@ public class AuditLogIntegrationTests
     public async Task BackgroundService_ShouldProcessQueuedLogsFromMultipleOperations()
     {
         // Arrange
-        var repository = Substitute.For<IKeyedRepository<FeatureFlag>>();
+        var repository = Substitute.For<IFeatureFlagRepository>();
         var mapper = new FeatureFlagMapper();
         var queueLogger = Substitute.For<ILogger<AuditLogQueue>>();
         var queue = new AuditLogQueue(queueLogger);
@@ -181,8 +181,8 @@ public class AuditLogIntegrationTests
         var backgroundLogger = Substitute.For<ILogger<AuditLogBackgroundService>>();
         var backgroundService = new AuditLogBackgroundService(queue, serviceProvider, backgroundLogger);
 
-        auditLogsService.AppendAsync(Arg.Any<AuditLogDTO>())
-            .Returns(x => Task.FromResult(x.Arg<AuditLogDTO>()));
+        auditLogsService.AppendAsync(Arg.Any<AuditLogDto>())
+            .Returns(x => Task.FromResult(x.Arg<AuditLogDto>()));
 
         // Configure repository mocks
         repository.GetByKeyAsync(Arg.Any<Guid>(), Arg.Any<string>()).Returns((FeatureFlag?)null);
@@ -196,9 +196,9 @@ public class AuditLogIntegrationTests
         });
 
         // Act - Perform multiple feature flag operations
-        var dto1 = new FeatureFlagDTO
+        var dto1 = new FeatureFlagDto
             { Key = "feature1", Enabled = true, Parameters = Array.Empty<FeatureFlagParameters>() };
-        var dto2 = new FeatureFlagDTO
+        var dto2 = new FeatureFlagDto
             { Key = "feature2", Enabled = false, Parameters = Array.Empty<FeatureFlagParameters>() };
 
         await featureFlagsService.CreateAsync(_testProjectId, dto1, "user1", "user1@example.com");
@@ -216,8 +216,10 @@ public class AuditLogIntegrationTests
         await backgroundService.StopAsync(CancellationToken.None);
 
         // Assert - Both audit logs should have been processed
-        await auditLogsService.Received(2).AppendAsync(Arg.Any<AuditLogDTO>());
-        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogDTO>(a => a.PerformedByUserId == "user1"));
-        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogDTO>(a => a.PerformedByUserId == "user2"));
+        await auditLogsService.Received(2).AppendAsync(Arg.Any<AuditLogDto>(), Arg.Any<CancellationToken>());
+        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogDto>(a => a.PerformedByUserId == "user1"),
+            Arg.Any<CancellationToken>());
+        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogDto>(a => a.PerformedByUserId == "user2"),
+            Arg.Any<CancellationToken>());
     }
 }

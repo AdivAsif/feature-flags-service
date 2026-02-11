@@ -22,7 +22,7 @@ public class Delete : IEndpoint
                         return Results.Unauthorized();
                     }
 
-                    logger.LogInformation("Deleting feature flag with key: {Key} for project: {ProjectId}", key,
+                    logger.LogDebug("Deleting feature flag with key: {Key} for project: {ProjectId}", key,
                         projectId);
                     var performedByUserId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ??
                                             httpContext.User.FindFirstValue("sub");

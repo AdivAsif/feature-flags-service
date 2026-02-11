@@ -5,20 +5,13 @@ using Microsoft.Extensions.Configuration;
 
 namespace Infrastructure.Data;
 
-public class DbSeeder
+public class DbSeeder(IDbContextFactory<FeatureFlagsDbContext> factory, IConfiguration configuration)
 {
-    private readonly IConfiguration _configuration;
-    private readonly FeatureFlagsDbContext _context;
-
-    public DbSeeder(FeatureFlagsDbContext context, IConfiguration configuration)
+    public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
-        _context = context;
-        _configuration = configuration;
-    }
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
 
-    public async Task SeedAsync()
-    {
-        var seedingEnabled = _configuration.GetValue("DatabaseSeeding:Enabled", true);
+        var seedingEnabled = configuration.GetValue("DatabaseSeeding:Enabled", true);
         if (!seedingEnabled)
         {
             Console.WriteLine("✓ Database seeding is disabled in configuration");
@@ -26,7 +19,7 @@ public class DbSeeder
         }
 
         // Check if any projects exist
-        if (await _context.Projects.AnyAsync())
+        if (await context.Projects.AnyAsync(cancellationToken))
         {
             Console.WriteLine("✓ Database already seeded, skipping...");
             return;
@@ -34,9 +27,9 @@ public class DbSeeder
 
         Console.WriteLine("→ Seeding database with default data...");
 
-        var createDefaultProject = _configuration.GetValue("DatabaseSeeding:CreateDefaultProject", true);
-        var createSampleApiKeys = _configuration.GetValue("DatabaseSeeding:CreateSampleApiKeys", true);
-        var createSampleFlags = _configuration.GetValue("DatabaseSeeding:CreateSampleFlags", true);
+        var createDefaultProject = configuration.GetValue("DatabaseSeeding:CreateDefaultProject", true);
+        var createSampleApiKeys = configuration.GetValue("DatabaseSeeding:CreateSampleApiKeys", true);
+        var createSampleFlags = configuration.GetValue("DatabaseSeeding:CreateSampleFlags", true);
 
         if (!createDefaultProject)
         {
@@ -55,8 +48,8 @@ public class DbSeeder
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
-        await _context.Projects.AddAsync(defaultProject);
-        await _context.SaveChangesAsync();
+        await context.Projects.AddAsync(defaultProject, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
 
         Console.WriteLine($"  ✓ Created default project: {defaultProject.Name} (ID: {defaultProject.Id})");
 
@@ -100,14 +93,14 @@ public class DbSeeder
                     UpdatedAt = DateTimeOffset.UtcNow
                 };
 
-                await _context.ApiKeys.AddAsync(apiKeyEntity);
+                await context.ApiKeys.AddAsync(apiKeyEntity, cancellationToken);
 
                 Console.WriteLine($"  ✓ Created API key: {keyConfig.Name}");
                 Console.WriteLine($"    Key: {apiKey}");
                 Console.WriteLine($"    Scopes: {keyConfig.Scopes}");
             }
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync(cancellationToken);
         }
 
         // Create sample feature flags
@@ -153,8 +146,8 @@ public class DbSeeder
                 }
             };
 
-            await _context.FeatureFlags.AddRangeAsync(sampleFlags);
-            await _context.SaveChangesAsync();
+            await context.FeatureFlags.AddRangeAsync(sampleFlags, cancellationToken);
+            await context.SaveChangesAsync(cancellationToken);
 
             Console.WriteLine($"  ✓ Created {sampleFlags.Length} sample feature flags");
         }

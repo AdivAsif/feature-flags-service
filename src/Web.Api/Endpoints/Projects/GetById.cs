@@ -14,7 +14,7 @@ public class GetById : IEndpoint
             {
                 try
                 {
-                    logger.LogInformation("Getting project by id: {Id}", id);
+                    logger.LogDebug("Getting project by id: {Id}", id);
 
                     var project = await projectService.GetByIdAsync(id);
 

@@ -1,35 +1,25 @@
-using Infrastructure.Repositories;
+using Application.Interfaces.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Services;
 
-public sealed class ApiKeyUsageBackgroundService : BackgroundService
+public sealed class ApiKeyUsageBackgroundService(
+    ApiKeyUsageQueue queue,
+    IServiceProvider serviceProvider,
+    ILogger<ApiKeyUsageBackgroundService> logger)
+    : BackgroundService
 {
-    private static readonly TimeSpan MinUpdateInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan MinUpdateInterval = TimeSpan.FromHours(1);
 
     private readonly Dictionary<Guid, DateTimeOffset> _lastUpdatedAtUtc = new();
-    private readonly ILogger<ApiKeyUsageBackgroundService> _logger;
-
-    private readonly ApiKeyUsageQueue _queue;
-    private readonly IServiceProvider _serviceProvider;
-
-    public ApiKeyUsageBackgroundService(
-        ApiKeyUsageQueue queue,
-        IServiceProvider serviceProvider,
-        ILogger<ApiKeyUsageBackgroundService> logger)
-    {
-        _queue = queue;
-        _serviceProvider = serviceProvider;
-        _logger = logger;
-    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("API Key Usage Background Service started");
+        logger.LogDebug("API Key Usage Background Service started");
 
-        var channel = _queue.GetChannel();
+        var channel = queue.GetChannel();
         await foreach (var apiKeyId in channel.Reader.ReadAllAsync(stoppingToken))
             try
             {
@@ -38,16 +28,16 @@ public sealed class ApiKeyUsageBackgroundService : BackgroundService
                     nowUtc - lastUpdatedAtUtc < MinUpdateInterval)
                     continue;
 
-                using var scope = _serviceProvider.CreateScope();
+                using var scope = serviceProvider.CreateScope();
                 var repository = scope.ServiceProvider.GetRequiredService<IApiKeyRepository>();
                 await repository.UpdateLastUsedAtAsync(apiKeyId, stoppingToken);
                 _lastUpdatedAtUtc[apiKeyId] = nowUtc;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating LastUsedAt for ApiKeyId: {ApiKeyId}", apiKeyId);
+                logger.LogError(ex, "Error updating LastUsedAt for ApiKeyId: {ApiKeyId}", apiKeyId);
             }
 
-        _logger.LogInformation("API Key Usage Background Service stopped");
+        logger.LogDebug("API Key Usage Background Service stopped");
     }
 }

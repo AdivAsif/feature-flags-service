@@ -4,14 +4,12 @@ namespace Application.Interfaces;
 
 public interface IAuditLogsService
 {
-    public Task<AuditLogDTO?> GetAsync(Guid id);
+    Task<AuditLogDto?> GetAsync(Guid id, CancellationToken cancellationToken = default);
 
-    public Task<IEnumerable<AuditLogDTO>> GetAllAsync(int? take = null, int? skip = null);
-    public Task<PagedDto<AuditLogDTO>> GetPagedAsync(int first = 10, string? after = null, string? before = null);
+    Task<PagedDto<AuditLogDto>> GetPagedAsync(int first = 10, string? after = null, string? before = null,
+        CancellationToken cancellationToken = default);
 
-    public Task<AuditLogDTO> AppendAsync(AuditLogDTO auditLog);
+    Task<AuditLogDto> AppendAsync(AuditLogDto auditLog, CancellationToken cancellationToken = default);
 
-    // public Task<AuditLogDTO> CreateAsync(AuditLogDTO auditLog);
-    // public Task<AuditLogDTO> UpdateAsync(Guid id, AuditLogDTO auditLog);
-    public Task DeleteAsync(Guid id);
+    Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
 }

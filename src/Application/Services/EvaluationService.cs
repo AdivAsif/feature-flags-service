@@ -1,17 +1,17 @@
-﻿using System.Security.Cryptography;
+﻿using System.IO.Hashing;
 using System.Text;
 using Application.DTOs;
 using Application.Exceptions;
 using Application.Interfaces;
+using Application.Interfaces.Repositories;
 using Domain;
-using SharedKernel;
 
 namespace Application.Services;
 
-public sealed class EvaluationService(IKeyedRepository<FeatureFlag> featureFlagRepository) : IEvaluationService
+public sealed class EvaluationService(IFeatureFlagRepository featureFlagRepository) : IEvaluationService
 {
-    public async Task<EvaluationResultDTO> EvaluateAsync(Guid projectId, string featureFlagKey,
-        EvaluationContext context)
+    public async Task<EvaluationResultDto> EvaluateAsync(Guid projectId, string featureFlagKey,
+        EvaluationContext context, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(featureFlagKey))
             throw new BadRequestException("Feature flag key cannot be null or whitespace");
@@ -22,112 +22,137 @@ public sealed class EvaluationService(IKeyedRepository<FeatureFlag> featureFlagR
         if (string.IsNullOrWhiteSpace(context.UserId))
             throw new BadRequestException("User ID cannot be null or whitespace");
 
-        var featureFlag = await featureFlagRepository.GetByKeyAsync(projectId, featureFlagKey);
+        var featureFlag = await featureFlagRepository.GetByKeyAsync(projectId, featureFlagKey, cancellationToken);
 
         return EvaluationHelper(featureFlag, context);
     }
 
-    private static EvaluationResultDTO EvaluationHelper(FeatureFlag? featureFlag, EvaluationContext context)
+    private static EvaluationResultDto EvaluationHelper(FeatureFlag? featureFlag, EvaluationContext context)
     {
         if (featureFlag is null)
-            return new EvaluationResultDTO
-            {
-                Allowed = false,
-                Reason = "Feature flag not found"
-            };
+            return new EvaluationResultDto(false, "Feature flag not found");
 
-        var defaultResult = new EvaluationResultDTO
+        var defaultResult = new EvaluationResultDto(featureFlag.Enabled,
+            featureFlag.Enabled ? "Feature flag is enabled" : "Feature flag is disabled");
+
+        var rules = featureFlag.Parameters;
+        if (rules.Length == 0) return defaultResult;
+
+        for (var i = 0; i < rules.Length; i++)
         {
-            Allowed = featureFlag.Enabled,
-            Reason = featureFlag.Enabled ? "Feature flag is enabled" : "Feature flag is disabled"
-        };
-
-        var featureFlagRules = featureFlag.Parameters;
-        if (featureFlagRules.Length == 0) return defaultResult;
-
-        /*
-         * Rule evaluation order (priority):
-         * 1. User targeting - Highest priority, immediate allow/deny
-         * 2. Group + Percentage combination - e.g., 50% of beta testers
-         * 3. Group targeting - User must be in specified group(s)
-         * 4. Percentage rollout - Consistent hashing based bucketing
-         */
-
-        // 1. User targeting - highest priority
-        var userRules = featureFlagRules.Where(r => r.RuleType == RuleType.User).ToArray();
-        if (userRules.Length > 0)
-        {
-            var userIds = userRules.SelectMany(r =>
-                r.RuleValue.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-            if (userIds.Contains(context.UserId))
-                return new EvaluationResultDTO
-                    { Allowed = featureFlag.Enabled, Reason = "User is explicitly targeted" };
+            var rule = rules[i];
+            if (rule.RuleType != RuleType.User) continue;
+            if (IsValueInCommaSeparatedList(rule.RuleValue, context.UserId))
+                return new EvaluationResultDto(featureFlag.Enabled, "User is explicitly targeted");
         }
 
         // 2. Check if user belongs to any required groups
-        var groupRules = featureFlagRules.Where(r => r.RuleType == RuleType.Group).ToArray();
-        var userGroups = context.Groups?.ToArray() ?? [];
-
-        var userInRequiredGroup = false;
+        var userGroups = context.Groups;
+        var groupRuleExists = false;
         string? matchedGroup = null;
 
-        if (groupRules.Length > 0)
+        for (var i = 0; i < rules.Length; i++)
         {
-            var requiredGroups = groupRules.SelectMany(r =>
-                    r.RuleValue.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                .ToArray();
-            matchedGroup = userGroups.FirstOrDefault(ug => requiredGroups.Contains(ug));
-            userInRequiredGroup = matchedGroup != null;
+            var rule = rules[i];
+            if (rule.RuleType != RuleType.Group) continue;
+            groupRuleExists = true;
+            if (userGroups != null)
+                foreach (var userGroup in userGroups)
+                    if (IsValueInCommaSeparatedList(rule.RuleValue, userGroup))
+                    {
+                        matchedGroup = userGroup;
+                        break;
+                    }
 
-            // If groups are defined but user not in any, deny access
-            if (!userInRequiredGroup)
-                return new EvaluationResultDTO { Allowed = false, Reason = "User not in required group" };
+            if (matchedGroup != null) break;
         }
 
-        // 3. Percentage rollout (with optional group scoping)
-        var percentageRules = featureFlagRules.Where(r => r.RuleType == RuleType.Percentage).ToArray();
-        if (percentageRules.Length > 0)
-        {
-            // Use consistent hashing similar to LaunchDarkly
-            var bucket = CalculateBucket(context.UserId, featureFlag.Key);
+        if (groupRuleExists && matchedGroup == null)
+            return new EvaluationResultDto(false, "User not in required group");
 
-            foreach (var rule in percentageRules)
-                if (int.TryParse(rule.RuleValue, out var percentageValue))
-                {
-                    if (bucket < percentageValue)
-                    {
-                        var reason = userInRequiredGroup
-                            ? $"User in '{matchedGroup}' group and within {percentageValue}% rollout"
-                            : $"User within {percentageValue}% rollout";
-                        return new EvaluationResultDTO { Allowed = featureFlag.Enabled, Reason = reason };
-                    }
-                    else
-                    {
-                        var reason = userInRequiredGroup
-                            ? $"User in '{matchedGroup}' group but outside {percentageValue}% rollout"
-                            : $"User outside {percentageValue}% rollout";
-                        return new EvaluationResultDTO { Allowed = false, Reason = reason };
-                    }
-                }
+        // 3. Percentage rollout
+        for (var i = 0; i < rules.Length; i++)
+        {
+            var rule = rules[i];
+            if (rule.RuleType != RuleType.Percentage) continue;
+            if (!int.TryParse(rule.RuleValue, out var percentageValue)) continue;
+            var bucket = CalculateBucket(context.UserId, featureFlag.Key);
+            if (bucket < percentageValue)
+            {
+                var reason = matchedGroup != null
+                    ? $"User in '{matchedGroup}' group and within {percentageValue}% rollout"
+                    : $"User within {percentageValue}% rollout";
+                return new EvaluationResultDto(featureFlag.Enabled, reason);
+            }
+            else
+            {
+                var reason = matchedGroup != null
+                    ? $"User in '{matchedGroup}' group but outside {percentageValue}% rollout"
+                    : $"User outside {percentageValue}% rollout";
+                return new EvaluationResultDto(false, reason);
+            }
         }
 
         // 4. If user is in required group but no percentage rule, allow
-        if (userInRequiredGroup)
-            return new EvaluationResultDTO
-                { Allowed = featureFlag.Enabled, Reason = $"User in required group '{matchedGroup}'" };
+        return matchedGroup != null
+            ? new EvaluationResultDto(featureFlag.Enabled, $"User in required group '{matchedGroup}'")
+            : defaultResult;
+    }
 
-        return defaultResult;
+    private static bool IsValueInCommaSeparatedList(string list, string value)
+    {
+        if (string.IsNullOrEmpty(list)) return false;
+
+        var span = list.AsSpan();
+        while (span.Length > 0)
+        {
+            var commaIndex = span.IndexOf(',');
+            ReadOnlySpan<char> item;
+            if (commaIndex == -1)
+            {
+                item = span;
+                span = ReadOnlySpan<char>.Empty;
+            }
+            else
+            {
+                item = span[..commaIndex];
+                span = span[(commaIndex + 1)..];
+            }
+
+            item = item.Trim();
+            if (item.Equals(value.AsSpan(), StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     private static int CalculateBucket(string userId, string flagKey)
     {
-        // Consistent hashing similar to LaunchDarkly's bucket algorithm
-        // Combines userId + flagKey to ensure same user gets different buckets for different flags
-        var input = $"{flagKey}.{userId}";
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(input));
+        // Optimized consistent hashing using XxHash32
+        // Much faster than SHA256 while maintaining good distribution
+        // Use stackalloc to avoid string allocation for the combined key
+        var totalLen = flagKey.Length + 1 + userId.Length;
+        uint hash;
+        if (totalLen <= 256)
+        {
+            Span<char> charBuffer = stackalloc char[totalLen];
+            flagKey.AsSpan().CopyTo(charBuffer);
+            charBuffer[flagKey.Length] = '.';
+            userId.AsSpan().CopyTo(charBuffer[(flagKey.Length + 1)..]);
 
-        // Take first 4 bytes and convert to int, then mod 100 for 0-99 range
-        var intHash = BitConverter.ToUInt32(hash, 0);
-        return (int)(intHash % 100);
+            // XxHash32 needs bytes, so we need to encode
+            Span<byte> byteBuffer = stackalloc byte[Encoding.UTF8.GetMaxByteCount(totalLen)];
+            var bytesWritten = Encoding.UTF8.GetBytes(charBuffer, byteBuffer);
+            hash = XxHash32.HashToUInt32(byteBuffer[..bytesWritten]);
+        }
+        else
+        {
+            var input = $"{flagKey}.{userId}";
+            var bytes = Encoding.UTF8.GetBytes(input);
+            hash = XxHash32.HashToUInt32(bytes);
+        }
+
+        return (int)(hash % 100);
     }
 }

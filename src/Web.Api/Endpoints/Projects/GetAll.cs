@@ -10,7 +10,7 @@ public class GetAll : IEndpoint
                 IProjectService projectService,
                 ILogger<GetAll> logger) =>
             {
-                logger.LogInformation("Getting all projects");
+                logger.LogDebug("Getting all projects");
 
                 var projects = await projectService.GetAllAsync();
 

@@ -1,88 +1,116 @@
+using Application.Interfaces.Repositories;
 using Domain;
+using Infrastructure.Caching;
+using Infrastructure.Services;
 using ZiggyCreatures.Caching.Fusion;
 
 namespace Infrastructure.Repositories;
 
 /// <summary>
 ///     Cached decorator for ApiKeyRepository using FusionCache.
-///     Dramatically reduces database load for API key validation.
+///     Cache Strategy:
+///     - Local: 4 hours (API keys rarely change)
+///     - Distributed: 24 hours
+///     - Background operations enabled for write-through caching
 /// </summary>
-public class CachedApiKeyRepository(IApiKeyRepository innerRepository, IFusionCache cache) : IApiKeyRepository
+public class CachedApiKeyRepository : IApiKeyRepository
 {
-    private const int CacheDurationMinutes = 5;
-
-    public Task<ApiKey?> GetByIdAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
+    private static readonly FusionCacheEntryOptions CacheOptions = new()
     {
-        return innerRepository.GetByIdAsync(apiKeyId, cancellationToken);
+        Duration = TimeSpan.FromHours(4),
+        DistributedCacheDuration = TimeSpan.FromHours(24),
+        IsFailSafeEnabled = true,
+        FailSafeMaxDuration = TimeSpan.FromHours(48),
+        AllowBackgroundDistributedCacheOperations = true,
+        Size = 1
+    };
+
+    private readonly IFusionCache _cache;
+    private readonly IApiKeyRepository _innerRepository;
+    private readonly ApiKeyUsageQueue _usageQueue;
+
+    public CachedApiKeyRepository(IApiKeyRepository innerRepository, IFusionCache cache, ApiKeyUsageQueue usageQueue)
+    {
+        _innerRepository = innerRepository;
+        _cache = cache;
+        _usageQueue = usageQueue;
+    }
+
+    public async Task<ApiKey?> GetByIdAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
+    {
+        var cacheKey = CacheKeys.ApiKeyById(apiKeyId);
+
+        return await _cache.GetOrSetAsync(
+            cacheKey,
+            async _ => await _innerRepository.GetByIdAsync(apiKeyId, cancellationToken),
+            CacheOptions,
+            cancellationToken);
     }
 
     /// <summary>
     ///     Get API key by hash with caching.
     ///     This is the HOT PATH for authentication - called on every request.
-    ///     Cache hit: ~1-2ms, Cache miss: ~10-20ms
     /// </summary>
     public async Task<ApiKey?> GetByKeyHashAsync(string keyHash, CancellationToken cancellationToken = default)
     {
-        var cacheKey = $"ApiKey:hash:{keyHash}";
+        var cacheKey = CacheKeys.ApiKey(keyHash);
 
-        var apiKey = await cache.GetOrSetAsync(
+        return await _cache.GetOrSetAsync(
             cacheKey,
-            async _ => await innerRepository.GetByKeyHashAsync(keyHash, cancellationToken),
-            options => options
-                .SetDuration(TimeSpan.FromMinutes(CacheDurationMinutes))
-                .SetFailSafe(true), // Return stale data if DB is down
+            async _ => await _innerRepository.GetByKeyHashAsync(keyHash, cancellationToken),
+            CacheOptions,
             cancellationToken);
-
-        return apiKey;
     }
 
     public async Task<IEnumerable<ApiKey>> GetByProjectIdAsync(Guid projectId,
         CancellationToken cancellationToken = default)
     {
-        var cacheKey = $"ApiKey:project:{projectId}";
+        var cacheKey = CacheKeys.ApiKeysByProject(projectId);
 
-        var apiKeys = await cache.GetOrSetAsync(
+        return await _cache.GetOrSetAsync(
             cacheKey,
-            async _ => await innerRepository.GetByProjectIdAsync(projectId, cancellationToken),
-            options => options.SetDuration(TimeSpan.FromMinutes(1)), // Shorter cache for list
+            async _ => await _innerRepository.GetByProjectIdAsync(projectId, cancellationToken),
+            new FusionCacheEntryOptions
+            {
+                Duration = TimeSpan.FromMinutes(30),
+                DistributedCacheDuration = TimeSpan.FromHours(2),
+                AllowBackgroundDistributedCacheOperations = true,
+                Size = 1
+            },
             cancellationToken);
-
-        return apiKeys;
     }
 
     public async Task<ApiKey> CreateAsync(ApiKey apiKey, CancellationToken cancellationToken = default)
     {
-        var createdKey = await innerRepository.CreateAsync(apiKey, cancellationToken);
+        var createdKey = await _innerRepository.CreateAsync(apiKey, cancellationToken);
 
-        // Cache the newly created key immediately
-        await cache.SetAsync($"ApiKey:hash:{createdKey.KeyHash}", createdKey,
-            options => options.SetDuration(TimeSpan.FromMinutes(CacheDurationMinutes)),
-            cancellationToken);
-
-        // Invalidate project list cache
-        await cache.RemoveAsync($"ApiKey:project:{createdKey.ProjectId}", token: cancellationToken);
+        _ = Task.Run(async () =>
+        {
+            await _cache.SetAsync(CacheKeys.ApiKey(createdKey.KeyHash), createdKey, CacheOptions, cancellationToken);
+            await _cache.SetAsync(CacheKeys.ApiKeyById(createdKey.Id), createdKey, CacheOptions, cancellationToken);
+            await _cache.RemoveAsync(CacheKeys.ApiKeysByProject(createdKey.ProjectId), token: cancellationToken);
+        }, cancellationToken);
 
         return createdKey;
     }
 
     public async Task RevokeAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
     {
-        // Get the key first to find its hash for cache invalidation.
-        // This is a trade-off: extra DB query but ensures cache consistency.
-        var apiKey = await innerRepository.GetByIdAsync(apiKeyId, cancellationToken);
+        var apiKey = await _innerRepository.GetByIdAsync(apiKeyId, cancellationToken);
+        await _innerRepository.RevokeAsync(apiKeyId, cancellationToken);
 
-        await innerRepository.RevokeAsync(apiKeyId, cancellationToken);
-
-        // Invalidate cache immediately - security critical!
         if (apiKey != null)
         {
-            await cache.RemoveAsync($"ApiKey:hash:{apiKey.KeyHash}", token: cancellationToken);
-            await cache.RemoveAsync($"ApiKey:project:{apiKey.ProjectId}", token: cancellationToken);
+            await _cache.RemoveAsync(CacheKeys.ApiKey(apiKey.KeyHash), token: cancellationToken);
+            await _cache.RemoveAsync(CacheKeys.ApiKeyById(apiKey.Id), token: cancellationToken);
+            await _cache.RemoveAsync(CacheKeys.ApiKeysByProject(apiKey.ProjectId), token: cancellationToken);
         }
     }
 
-    public Task UpdateLastUsedAtAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
+    public async Task UpdateLastUsedAtAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
     {
-        return innerRepository.UpdateLastUsedAtAsync(apiKeyId, cancellationToken);
+        // Queue for background processing instead of blocking the request
+        // The background service will throttle updates to once per hour per key
+        _ = _usageQueue.QueueApiKeyUsageAsync(apiKeyId, cancellationToken);
     }
 }

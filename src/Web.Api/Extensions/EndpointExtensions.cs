@@ -8,7 +8,7 @@ namespace Web.Api.Extensions;
 
 public static class EndpointExtensions
 {
-    public static IServiceCollection AddEndpoints(this IServiceCollection services, Assembly assembly)
+    public static void AddEndpoints(this IServiceCollection services, Assembly assembly)
     {
         var serviceDescriptors = assembly
             .GetTypes()
@@ -17,34 +17,13 @@ public static class EndpointExtensions
             .Select(type => ServiceDescriptor.Transient(typeof(IEndpoint), type));
 
         services.TryAddEnumerable(serviceDescriptors);
-
-        return services;
     }
 
-    public static IApplicationBuilder MapEndpoints(this WebApplication app)
-    {
-        app.MapEndpoints(app.Services);
-        return app;
-    }
-
-    public static IEndpointRouteBuilder MapEndpoints(this IEndpointRouteBuilder app, IServiceProvider services)
+    public static void MapEndpoints(this IEndpointRouteBuilder app, IServiceProvider services)
     {
         var endpoints = services.GetRequiredService<IEnumerable<IEndpoint>>();
 
         foreach (var endpoint in endpoints)
             endpoint.MapEndpoint(app);
-
-        return app;
-    }
-
-    public static EvaluationContext ToEvaluationContext(this ClaimsPrincipal user)
-    {
-        var userId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
-        var email = user.FindFirstValue(ClaimTypes.Email) ?? string.Empty;
-        var groups = user.FindAll("group").Select(c => c.Value).ToList();
-        var tenantId = user.FindFirstValue("tenant_id");
-        var environment = user.FindFirstValue("environment");
-
-        return new EvaluationContext(userId, email, groups, tenantId, environment);
     }
 }

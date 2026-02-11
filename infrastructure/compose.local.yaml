@@ -3,15 +3,19 @@ services:
     build:
       context: ..
       dockerfile: infrastructure/Dockerfile
+      args:
+        INSTALL_DIAGNOSTICS_TOOLS: "true"
     container_name: feature_flags_api
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
       - ConnectionStrings__FeatureFlagsDatabase=Host=postgres;Database=feature_flags_db;Username=postgres;Password=password
       - ConnectionStrings__FeatureFlagsCache=redis:6379
       - JwtSecretKey=adivadivadivadivadivadivadivadiv
       - JwtIssuer=http://localhost:8080
       - JwtAudience=feature_flags_api
+      - Logging__LogLevel__Default=Information
+      - Logging__LogLevel__ZiggyCreatures.Caching.Fusion=Warning
     ports:
       - "5000:8080"
     networks:
@@ -83,6 +87,9 @@ services:
   
   renderer:
     image: grafana/grafana-image-renderer:latest
+    networks:
+      - feature-flags-network
+    restart: unless-stopped
   
   grafana:
     image: grafana/grafana:latest
@@ -104,6 +111,7 @@ services:
       - feature-flags-network
     depends_on:
       - prometheus
+      - renderer
   
   k6:
     image: grafana/k6:latest
@@ -111,18 +119,26 @@ services:
     networks:
       - feature-flags-network
     volumes:
-      - "./k6.local.mixed.js:/scripts/k6-load-test.js"
+      - "./k6.evaluation.js:/scripts/k6.evaluation.js"
+      - "./k6.evaluation.steady.js:/scripts/k6.evaluation.steady.js"
+      - "./k6.portfolio-evaluation.js:/scripts/k6.portfolio-evaluation.js"
       - "k6_results:/results"
     environment:
-      - K6_OUT=json=/results/k6-results.json
+      - K6_SUMMARY_EXPORT=/results/summary.json
       - BASE_URL=http://api:8080
+      # Switch between scripts without editing compose.
+      # Examples:
+      # - /scripts/k6.evaluation.steady.js (no setup, constant rate)
+      # - /scripts/k6.evaluation.js (lightweight provisioning + ramp)
+      # - /scripts/k6.portfolio-evaluation.js (heavier provisioning + ramp)
+      - K6_SCRIPT=/scripts/k6.evaluation.steady.js
     user: root
     depends_on:
       api:
         condition: service_healthy
     profiles:
-      - load-test
-    entrypoint: [ "/bin/sh", "-c", "exec k6 run --out json=/results/k6-results.json /scripts/k6-load-test.js" ]
+      - with-load-test
+    entrypoint: [ "/bin/sh", "-c", "exec k6 run --out json=/results/k6-results.json \"$${K6_SCRIPT}\"" ]
   
   metabase:
     image: metabase/metabase:latest

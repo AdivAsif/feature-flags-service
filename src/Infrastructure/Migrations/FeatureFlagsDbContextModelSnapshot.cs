@@ -79,6 +79,8 @@ namespace Infrastructure.Migrations
                     b.HasIndex("KeyHash")
                         .IsUnique();
 
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("KeyHash"), new[] { "ProjectId", "IsActive", "Scopes" });
+
                     b.HasIndex("ProjectId");
 
                     b.HasIndex("ProjectId", "IsActive");
@@ -173,6 +175,8 @@ namespace Infrastructure.Migrations
                     b.HasIndex("ProjectId", "Key")
                         .IsUnique();
 
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("ProjectId", "Key"), new[] { "Enabled", "Version", "Parameters", "Description" });
+
                     b.HasIndex("ProjectId", "Key", "Enabled", "Version");
 
                     b.ToTable("FeatureFlags");
@@ -208,6 +212,8 @@ namespace Infrastructure.Migrations
                     b.HasIndex("IsActive");
 
                     b.HasIndex("Name");
+
+                    b.HasIndex("IsActive", "Name");
 
                     b.ToTable("Projects");
                 });

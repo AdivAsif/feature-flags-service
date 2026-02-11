@@ -12,7 +12,7 @@ public class Delete : IEndpoint
             {
                 try
                 {
-                    logger.LogInformation("Deleting project with id: {Id}", id);
+                    logger.LogDebug("Deleting project with id: {Id}", id);
 
                     await projectService.DeleteAsync(id);
 

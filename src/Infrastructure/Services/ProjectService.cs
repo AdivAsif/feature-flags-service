@@ -1,80 +1,53 @@
 using Application.DTOs;
 using Application.Exceptions;
 using Application.Interfaces;
+using Application.Interfaces.Repositories;
 using Domain;
-using Infrastructure.Repositories;
 
 namespace Infrastructure.Services;
 
-public sealed class ProjectService : IProjectService
+public sealed class ProjectService(IProjectRepository projectRepository) : IProjectService
 {
-    private readonly ProjectRepository _projectRepository;
-
-    public ProjectService(ProjectRepository projectRepository)
+    public async Task<ProjectDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        _projectRepository = projectRepository;
+        var project = await projectRepository.GetByIdAsync(id, cancellationToken);
+        return project == null ? throw new NotFoundException($"Project with id: {id} not found") : Map(project);
     }
 
-    public async Task<ProjectDTO?> GetByIdAsync(Guid id)
+    public async Task<IEnumerable<ProjectDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        var project = await _projectRepository.GetByIdAsync(id);
-        if (project == null)
-            throw new NotFoundException($"Project with id: {id} not found");
-
-        return new ProjectDTO
-        {
-            Id = project.Id,
-            Name = project.Name,
-            Description = project.Description,
-            IsActive = project.IsActive,
-            CreatedAt = project.CreatedAt,
-            UpdatedAt = project.UpdatedAt
-        };
+        var projects = await projectRepository.GetAllAsync(cancellationToken);
+        return projects.Select(Map);
     }
 
-    public async Task<IEnumerable<ProjectDTO>> GetAllAsync()
-    {
-        var projects = await _projectRepository.GetAllAsync();
-        return projects.Select(p => new ProjectDTO
-        {
-            Id = p.Id,
-            Name = p.Name,
-            Description = p.Description,
-            IsActive = p.IsActive,
-            CreatedAt = p.CreatedAt,
-            UpdatedAt = p.UpdatedAt
-        });
-    }
-
-    public async Task<ProjectDTO> CreateAsync(CreateProjectDTO dto, string? performedByUserId = null)
+    public async Task<CreateProjectResult> CreateAsync(CreateProjectDto dto, string? performedByUserId = null,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(dto.Name))
             throw new BadRequestException("Project name is required");
 
+        var trimmedName = dto.Name.Trim();
+        var existing = await projectRepository.GetByNameAsync(trimmedName, cancellationToken);
+        if (existing != null)
+            return new CreateProjectResult(Map(existing), false);
+
         var project = new Project
         {
-            Name = dto.Name,
+            Name = trimmedName,
             Description = dto.Description,
             IsActive = true,
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        var created = await _projectRepository.CreateAsync(project);
+        var created = await projectRepository.CreateAsync(project, cancellationToken);
 
-        return new ProjectDTO
-        {
-            Id = created.Id,
-            Name = created.Name,
-            Description = created.Description,
-            IsActive = created.IsActive,
-            CreatedAt = created.CreatedAt,
-            UpdatedAt = created.UpdatedAt
-        };
+        return new CreateProjectResult(Map(created), true);
     }
 
-    public async Task<ProjectDTO> UpdateAsync(Guid id, UpdateProjectDTO dto)
+    public async Task<ProjectDto> UpdateAsync(Guid id, UpdateProjectDto dto,
+        CancellationToken cancellationToken = default)
     {
-        var project = await _projectRepository.GetByIdAsync(id);
+        var project = await projectRepository.GetByIdAsync(id, cancellationToken);
         if (project == null)
             throw new NotFoundException($"Project with id: {id} not found");
 
@@ -84,26 +57,32 @@ public sealed class ProjectService : IProjectService
         project.Name = dto.Name;
         project.Description = dto.Description;
         project.IsActive = dto.IsActive;
+        project.UpdatedAt = DateTimeOffset.UtcNow;
 
-        var updated = await _projectRepository.UpdateAsync(project);
+        var updated = await projectRepository.UpdateAsync(project, cancellationToken);
 
-        return new ProjectDTO
-        {
-            Id = updated.Id,
-            Name = updated.Name,
-            Description = updated.Description,
-            IsActive = updated.IsActive,
-            CreatedAt = updated.CreatedAt,
-            UpdatedAt = updated.UpdatedAt
-        };
+        return Map(updated);
     }
 
-    public async Task DeleteAsync(Guid id)
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var project = await _projectRepository.GetByIdAsync(id);
+        var project = await projectRepository.GetByIdAsync(id, cancellationToken);
         if (project == null)
             throw new NotFoundException($"Project with id: {id} not found");
 
-        await _projectRepository.DeleteAsync(id);
+        await projectRepository.DeleteAsync(id, cancellationToken);
+    }
+
+    private static ProjectDto Map(Project project)
+    {
+        return new ProjectDto
+        {
+            Id = project.Id,
+            Name = project.Name,
+            Description = project.Description,
+            IsActive = project.IsActive,
+            CreatedAt = project.CreatedAt,
+            UpdatedAt = project.UpdatedAt
+        };
     }
 }

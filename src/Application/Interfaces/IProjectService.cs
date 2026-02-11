@@ -4,9 +4,12 @@ namespace Application.Interfaces;
 
 public interface IProjectService
 {
-    Task<ProjectDTO?> GetByIdAsync(Guid id);
-    Task<IEnumerable<ProjectDTO>> GetAllAsync();
-    Task<ProjectDTO> CreateAsync(CreateProjectDTO dto, string? performedByUserId = null);
-    Task<ProjectDTO> UpdateAsync(Guid id, UpdateProjectDTO dto);
-    Task DeleteAsync(Guid id);
+    Task<ProjectDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IEnumerable<ProjectDto>> GetAllAsync(CancellationToken cancellationToken = default);
+
+    Task<CreateProjectResult> CreateAsync(CreateProjectDto dto, string? performedByUserId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<ProjectDto> UpdateAsync(Guid id, UpdateProjectDto dto, CancellationToken cancellationToken = default);
+    Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
 }

@@ -23,7 +23,7 @@ public class GetAll : IEndpoint
                     return Results.Unauthorized();
                 }
 
-                logger.LogInformation(
+                logger.LogDebug(
                     "Getting feature flags for project {ProjectId} with cursor pagination (first: {First}, after: {After}, before: {Before})",
                     projectId, first, after ?? "null", before ?? "null");
 

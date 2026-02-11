@@ -14,7 +14,7 @@ public class GetByProjectId : IEndpoint
             {
                 try
                 {
-                    logger.LogInformation("Getting API keys for project: {ProjectId}", projectId);
+                    logger.LogDebug("Getting API keys for project: {ProjectId}", projectId);
 
                     var apiKeys = await apiKeyService.GetByProjectIdAsync(projectId);
 

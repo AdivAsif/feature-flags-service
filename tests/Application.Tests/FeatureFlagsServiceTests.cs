@@ -1,6 +1,7 @@
 using Application.DTOs;
 using Application.Exceptions;
 using Application.Interfaces;
+using Application.Interfaces.Repositories;
 using Application.Services;
 using Domain;
 using FluentAssertions;
@@ -13,50 +14,18 @@ namespace Application.Tests;
 public class FeatureFlagsServiceTests
 {
     private readonly AuditLogQueue _auditLogQueue;
-    private readonly IKeyedRepository<FeatureFlag> _repository;
+    private readonly IFeatureFlagRepository _repository;
     private readonly IFeatureFlagsService _service;
     private readonly Guid _testProjectId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     public FeatureFlagsServiceTests()
     {
-        _repository = Substitute.For<IKeyedRepository<FeatureFlag>>();
+        _repository = Substitute.For<IFeatureFlagRepository>();
         var logger = Substitute.For<ILogger<AuditLogQueue>>();
         _auditLogQueue = new AuditLogQueue(logger);
         var mapper = new FeatureFlagMapper();
         _service = new FeatureFlagsService(_repository, mapper, _auditLogQueue);
     }
-
-    #region GetAllAsync Tests
-
-    [Fact]
-    public async Task GetAllAsync_ShouldReturnAllFeatureFlags()
-    {
-        // Arrange
-        var featureFlags = new List<FeatureFlag>
-        {
-            new()
-            {
-                Id = Guid.NewGuid(), ProjectId = _testProjectId, Key = "feature-1", Enabled = true,
-                CreatedAt = DateTimeOffset.UtcNow
-            },
-            new()
-            {
-                Id = Guid.NewGuid(), ProjectId = _testProjectId, Key = "feature-2", Enabled = false,
-                CreatedAt = DateTimeOffset.UtcNow
-            }
-        };
-        _repository.GetAllAsync(Arg.Any<int?>(), Arg.Any<int?>()).Returns(featureFlags);
-
-        // Act
-        var result = await _service.GetAllAsync(_testProjectId);
-
-        // Assert
-        result.Should().HaveCount(2);
-        result.Should().Contain(f => f.Key == "feature-1");
-        result.Should().Contain(f => f.Key == "feature-2");
-    }
-
-    #endregion
 
     #region GetPagedAsync Tests
 
@@ -89,7 +58,8 @@ public class FeatureFlagsServiceTests
                 EndCursor = "cursor2"
             }
         };
-        _repository.GetPagedAsync(Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<string?>()).Returns(pagedResult);
+        _repository.GetPagedAsync(Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<string?>())
+            .Returns(pagedResult);
 
         // Act
         var result = await _service.GetPagedAsync(_testProjectId);
@@ -120,7 +90,7 @@ public class FeatureFlagsServiceTests
             Version = 1,
             CreatedAt = DateTimeOffset.UtcNow
         };
-        _repository.GetByIdAsync(id).Returns(featureFlag);
+        _repository.GetByIdAsync(_testProjectId, id).Returns(featureFlag);
 
         // Act
         var result = await _service.GetAsync(_testProjectId, id);
@@ -129,7 +99,7 @@ public class FeatureFlagsServiceTests
         result.Should().NotBeNull();
         result!.Id.Should().Be(id);
         result.Key.Should().Be("test-feature");
-        await _repository.Received(1).GetByIdAsync(id);
+        await _repository.Received(1).GetByIdAsync(_testProjectId, id);
     }
 
     [Fact]
@@ -137,7 +107,7 @@ public class FeatureFlagsServiceTests
     {
         // Arrange
         var id = Guid.NewGuid();
-        _repository.GetByIdAsync(id).Returns((FeatureFlag?)null);
+        _repository.GetByIdAsync(_testProjectId, id).Returns((FeatureFlag?)null);
 
         // Act
         var act = async () => await _service.GetAsync(_testProjectId, id);
@@ -200,7 +170,7 @@ public class FeatureFlagsServiceTests
     public async Task CreateAsync_WithValidData_ShouldCreateFeatureFlag()
     {
         // Arrange
-        var dto = new FeatureFlagDTO
+        var dto = new FeatureFlagDto
         {
             Key = "new-feature",
             Description = "New feature",
@@ -231,7 +201,7 @@ public class FeatureFlagsServiceTests
     public async Task CreateAsync_WithNullKey_ShouldThrowBadRequestException()
     {
         // Arrange
-        var dto = new FeatureFlagDTO { Key = null! };
+        var dto = new FeatureFlagDto { Key = null! };
 
         // Act
         var act = async () => await _service.CreateAsync(_testProjectId, dto);
@@ -245,7 +215,7 @@ public class FeatureFlagsServiceTests
     public async Task CreateAsync_WithExistingKey_ShouldThrowBadRequestException()
     {
         // Arrange
-        var dto = new FeatureFlagDTO { Key = "existing-feature" };
+        var dto = new FeatureFlagDto { Key = "existing-feature" };
         var existingFlag = new FeatureFlag { Key = "existing-feature", ProjectId = _testProjectId };
         _repository.GetByKeyAsync(_testProjectId, dto.Key).Returns(existingFlag);
 
@@ -276,7 +246,7 @@ public class FeatureFlagsServiceTests
             Version = 1,
             CreatedAt = DateTimeOffset.UtcNow
         };
-        var dto = new FeatureFlagDTO
+        var dto = new FeatureFlagDto
         {
             Key = key,
             Description = "Updated description",
@@ -301,7 +271,7 @@ public class FeatureFlagsServiceTests
     public async Task UpdateAsync_WithEmptyKey_ShouldThrowBadRequestException()
     {
         // Arrange
-        var dto = new FeatureFlagDTO();
+        var dto = new FeatureFlagDto();
 
         // Act
         var act = async () => await _service.UpdateAsync(_testProjectId, "", dto);
@@ -316,7 +286,7 @@ public class FeatureFlagsServiceTests
     {
         // Arrange
         var key = "non-existent";
-        var dto = new FeatureFlagDTO { Key = key };
+        var dto = new FeatureFlagDto { Key = key };
         _repository.GetByKeyAsync(_testProjectId, key).Returns((FeatureFlag?)null);
 
         // Act
@@ -333,7 +303,7 @@ public class FeatureFlagsServiceTests
         var existingKey = "original-key";
         var newKey = "different-key";
         var existingFlag = new FeatureFlag { Key = existingKey, ProjectId = _testProjectId };
-        var dto = new FeatureFlagDTO { Key = newKey };
+        var dto = new FeatureFlagDto { Key = newKey };
         _repository.GetByKeyAsync(_testProjectId, existingKey).Returns(existingFlag);
 
         // Act
@@ -361,7 +331,7 @@ public class FeatureFlagsServiceTests
         await _service.DeleteByKeyAsync(_testProjectId, key);
 
         // Assert
-        await _repository.Received(1).DeleteAsync(id);
+        await _repository.Received(1).DeleteAsync(_testProjectId, id);
     }
 
     [Fact]

@@ -5,41 +5,31 @@ using Microsoft.Extensions.Logging;
 
 namespace Application.Services;
 
-public class AuditLogBackgroundService : BackgroundService
+public class AuditLogBackgroundService(
+    AuditLogQueue queue,
+    IServiceProvider serviceProvider,
+    ILogger<AuditLogBackgroundService> logger)
+    : BackgroundService
 {
-    private readonly ILogger<AuditLogBackgroundService> _logger;
-    private readonly AuditLogQueue _queue;
-    private readonly IServiceProvider _serviceProvider;
-
-    public AuditLogBackgroundService(
-        AuditLogQueue queue,
-        IServiceProvider serviceProvider,
-        ILogger<AuditLogBackgroundService> logger)
-    {
-        _queue = queue;
-        _serviceProvider = serviceProvider;
-        _logger = logger;
-    }
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Audit Log Background Service started");
+        logger.LogDebug("Audit Log Background Service started");
 
-        var channel = _queue.GetChannel();
+        var channel = queue.GetChannel();
         await foreach (var auditLog in channel.Reader.ReadAllAsync(stoppingToken))
             try
             {
-                using var scope = _serviceProvider.CreateScope();
+                using var scope = serviceProvider.CreateScope();
                 var auditLogsService = scope.ServiceProvider.GetRequiredService<IAuditLogsService>();
-                await auditLogsService.AppendAsync(auditLog);
-                _logger.LogDebug("Processed audit log for FeatureFlagId: {FeatureFlagId}", auditLog.FeatureFlagId);
+                await auditLogsService.AppendAsync(auditLog, stoppingToken);
+                logger.LogDebug("Processed audit log for FeatureFlagId: {FeatureFlagId}", auditLog.FeatureFlagId);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing audit log for FeatureFlagId: {FeatureFlagId}",
+                logger.LogError(ex, "Error processing audit log for FeatureFlagId: {FeatureFlagId}",
                     auditLog.FeatureFlagId);
             }
 
-        _logger.LogInformation("Audit Log Background Service stopped");
+        logger.LogDebug("Audit Log Background Service stopped");
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 using Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -7,6 +8,13 @@ namespace Infrastructure.Data;
 
 public class FeatureFlagsDbContext(DbContextOptions<FeatureFlagsDbContext> options) : DbContext(options)
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        WriteIndented = false
+    };
+
     public DbSet<FeatureFlag> FeatureFlags { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
     public DbSet<Project> Projects { get; set; }
@@ -25,11 +33,13 @@ public class FeatureFlagsDbContext(DbContextOptions<FeatureFlagsDbContext> optio
             entity.Property(e => e.Enabled).IsRequired();
             entity.Property(e => e.Version).IsRequired();
             entity.Property(e => e.Parameters).HasConversion(p =>
-                    JsonSerializer.Serialize(p, (JsonSerializerOptions?)null),
-                p => JsonSerializer.Deserialize<FeatureFlagParameters[]>(p, (JsonSerializerOptions?)null) ??
+                    JsonSerializer.Serialize(p, JsonOptions),
+                p => JsonSerializer.Deserialize<FeatureFlagParameters[]>(p, JsonOptions) ??
                      Array.Empty<FeatureFlagParameters>());
             entity.HasIndex(e => e.ProjectId);
             entity.HasIndex(e => new { e.ProjectId, e.Key }).IsUnique();
+            entity.HasIndex(e => new { e.ProjectId, e.Key })
+                .IncludeProperties(e => new { e.Enabled, e.Version, e.Parameters, e.Description });
             entity.HasIndex(e => new { e.ProjectId, e.Key, e.Enabled, e.Version });
         });
 
@@ -41,14 +51,6 @@ public class FeatureFlagsDbContext(DbContextOptions<FeatureFlagsDbContext> optio
                 .HasConversion(new EnumToStringConverter<AuditLogAction>());
             entity.Property(e => e.PerformedByUserId).IsRequired().HasMaxLength(100);
             entity.Property(e => e.PerformedByUserEmail).IsRequired().HasMaxLength(100);
-            // entity.Property(e => e.NewFeatureFlagState).HasConversion(s =>
-            //         JsonSerializer.Serialize(s, (JsonSerializerOptions?)null),
-            //     s => JsonSerializer.Deserialize<FeatureFlag>(s, (JsonSerializerOptions?)null) ??
-            //          new FeatureFlag()).IsRequired();
-            // entity.Property(e => e.PreviousFeatureFlagState).IsRequired(false).HasConversion(s =>
-            //         JsonSerializer.Serialize(s, (JsonSerializerOptions?)null),
-            //     s => JsonSerializer.Deserialize<FeatureFlag>(s, (JsonSerializerOptions?)null) ??
-            //          null);
             entity.HasIndex(e => e.CreatedAt);
         });
 
@@ -60,6 +62,7 @@ public class FeatureFlagsDbContext(DbContextOptions<FeatureFlagsDbContext> optio
             entity.Property(e => e.IsActive).IsRequired();
             entity.HasIndex(e => e.Name);
             entity.HasIndex(e => e.IsActive);
+            entity.HasIndex(e => new { e.IsActive, e.Name });
         });
 
         modelBuilder.Entity<ApiKey>(entity =>
@@ -72,7 +75,9 @@ public class FeatureFlagsDbContext(DbContextOptions<FeatureFlagsDbContext> optio
             entity.Property(e => e.Scopes).IsRequired().HasMaxLength(500);
             entity.Property(e => e.CreatedByUserId).IsRequired().HasMaxLength(100);
             entity.Property(e => e.IsActive).IsRequired();
-            entity.HasIndex(e => e.KeyHash).IsUnique();
+            entity.HasIndex(e => e.KeyHash)
+                .IsUnique()
+                .IncludeProperties(e => new { e.ProjectId, e.IsActive, e.Scopes });
             entity.HasIndex(e => e.ProjectId);
             entity.HasIndex(e => new { e.ProjectId, e.IsActive });
         });

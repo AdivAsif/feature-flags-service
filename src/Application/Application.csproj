@@ -4,6 +4,8 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <Configurations>Debug;Release;Production</Configurations>
+        <Platforms>AnyCPU</Platforms>
     </PropertyGroup>
 
     <ItemGroup>
@@ -19,6 +21,7 @@
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0"/>
         <PackageReference Include="Riok.Mapperly" Version="5.0.0-next.0"/>
+        <PackageReference Include="System.IO.Hashing" Version="10.0.2"/>
     </ItemGroup>
 
 </Project>

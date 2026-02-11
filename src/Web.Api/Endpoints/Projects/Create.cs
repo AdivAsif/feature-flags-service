@@ -10,25 +10,26 @@ public class Create : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPost("/projects",
-            async (CreateProjectDTO createProjectDto, HttpContext httpContext, IProjectService projectService,
+            async (CreateProjectDto createProjectDto, HttpContext httpContext, IProjectService projectService,
                 ILogger<Create> logger) =>
             {
                 try
                 {
                     // Debug: Log all claims
                     var claims = httpContext.User.Claims.Select(c => $"{c.Type}={c.Value}");
-                    logger.LogInformation("User claims: {Claims}", string.Join(", ", claims));
-                    logger.LogInformation("User.Identity.IsAuthenticated: {IsAuthenticated}",
+                    logger.LogDebug("User claims: {Claims}", string.Join(", ", claims));
+                    logger.LogDebug("User.Identity.IsAuthenticated: {IsAuthenticated}",
                         httpContext.User.Identity?.IsAuthenticated);
 
-                    logger.LogInformation("Creating project with name: {Name}", createProjectDto.Name);
+                    logger.LogDebug("Creating project with name: {Name}", createProjectDto.Name);
                     var performedByUserId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ??
                                             httpContext.User.FindFirstValue("sub");
 
-                    var createdProject = await projectService.CreateAsync(createProjectDto, performedByUserId);
+                    var result = await projectService.CreateAsync(createProjectDto, performedByUserId);
 
-                    return Results.CreatedAtRoute("GetProjectById", new { id = createdProject.Id },
-                        createdProject);
+                    return result.Created
+                        ? Results.CreatedAtRoute("GetProjectById", new { id = result.Project.Id }, result.Project)
+                        : Results.Ok(result.Project);
                 }
                 catch (BadRequestException ex)
                 {

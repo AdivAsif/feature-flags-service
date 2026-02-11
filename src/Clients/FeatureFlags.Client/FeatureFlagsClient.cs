@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json;
 using FeatureFlags.Client.Exceptions;
+using FeatureFlags.Client.Models;
 using FeatureFlags.Client.ProblemDetails;
 
 namespace FeatureFlags.Client;

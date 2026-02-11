@@ -1,26 +1,27 @@
 using Application.DTOs;
 using Application.Exceptions;
 using Application.Interfaces;
+using Application.Interfaces.Repositories;
 using Domain;
 using Infrastructure.Authentication;
-using Infrastructure.Repositories;
 
 namespace Infrastructure.Services;
 
 public sealed class ApiKeyService : IApiKeyService
 {
-    private readonly ApiKeyRepository _apiKeyRepository;
-    private readonly ProjectRepository _projectRepository;
+    private readonly IApiKeyRepository _apiKeyRepository;
+    private readonly IProjectRepository _projectRepository;
 
-    public ApiKeyService(ApiKeyRepository apiKeyRepository, ProjectRepository projectRepository)
+    public ApiKeyService(IApiKeyRepository apiKeyRepository, IProjectRepository projectRepository)
     {
         _apiKeyRepository = apiKeyRepository;
         _projectRepository = projectRepository;
     }
 
-    public async Task<ApiKeyCreatedDTO> CreateAsync(Guid projectId, CreateApiKeyDTO dto, string createdByUserId)
+    public async Task<ApiKeyCreatedDTO> CreateAsync(Guid projectId, CreateApiKeyDTO dto, string createdByUserId,
+        CancellationToken cancellationToken = default)
     {
-        var project = await _projectRepository.GetByIdAsync(projectId);
+        var project = await _projectRepository.GetByIdAsync(projectId, cancellationToken);
         if (project == null)
             throw new NotFoundException($"Project with id: {projectId} not found");
 
@@ -48,7 +49,7 @@ public sealed class ApiKeyService : IApiKeyService
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        var created = await _apiKeyRepository.CreateAsync(apiKeyEntity);
+        var created = await _apiKeyRepository.CreateAsync(apiKeyEntity, cancellationToken);
 
         return new ApiKeyCreatedDTO
         {
@@ -61,15 +62,16 @@ public sealed class ApiKeyService : IApiKeyService
         };
     }
 
-    public async Task<IEnumerable<ApiKeyDTO>> GetByProjectIdAsync(Guid projectId)
+    public async Task<IEnumerable<ApiKeyDto>> GetByProjectIdAsync(Guid projectId,
+        CancellationToken cancellationToken = default)
     {
-        var project = await _projectRepository.GetByIdAsync(projectId);
+        var project = await _projectRepository.GetByIdAsync(projectId, cancellationToken);
         if (project == null)
             throw new NotFoundException($"Project with id: {projectId} not found");
 
-        var apiKeys = await _apiKeyRepository.GetByProjectIdAsync(projectId);
+        var apiKeys = await _apiKeyRepository.GetByProjectIdAsync(projectId, cancellationToken);
 
-        return apiKeys.Select(k => new ApiKeyDTO
+        return apiKeys.Select(k => new ApiKeyDto
         {
             Id = k.Id,
             ProjectId = k.ProjectId,
@@ -86,13 +88,13 @@ public sealed class ApiKeyService : IApiKeyService
         });
     }
 
-    public async Task RevokeAsync(Guid projectId, Guid apiKeyId)
+    public async Task RevokeAsync(Guid projectId, Guid apiKeyId, CancellationToken cancellationToken = default)
     {
-        var project = await _projectRepository.GetByIdAsync(projectId);
+        var project = await _projectRepository.GetByIdAsync(projectId, cancellationToken);
         if (project == null)
             throw new NotFoundException($"Project with id: {projectId} not found");
 
         // Note: We could add validation here to ensure the API key belongs to the project
-        await _apiKeyRepository.RevokeAsync(apiKeyId);
+        await _apiKeyRepository.RevokeAsync(apiKeyId, cancellationToken);
     }
 }

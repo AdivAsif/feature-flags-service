@@ -1,5 +1,5 @@
 import http from 'k6/http';
-import {check, sleep} from 'k6';
+import {check} from 'k6';
 import {Counter, Rate, Trend} from 'k6/metrics';
 
 // Custom metrics
@@ -20,6 +20,9 @@ export const options = {
         {duration: '30s', target: 100},  // Stay at peak
         {duration: '15s', target: 0},    // Ramp down to 0 users
     ],
+    // Reduce metric cardinality (Prometheus/Grafana can explode on per-URL/query values).
+    // Prefer the stable `name` tag we set on each request.
+    systemTags: ['status', 'method', 'name', 'group', 'scenario', 'expected_response'],
     thresholds: {
         http_req_duration: ['p(95)<10', 'p(99)<15'], // 95% under 10ms, 99% under 15ms
         http_req_failed: ['rate<0.05'],              // Error rate under 5%
@@ -30,6 +33,47 @@ export const options = {
 };
 
 const BASE_URL = __ENV.BASE_URL || 'http://host.docker.internal:5000';
+const API_VERSION = __ENV.API_VERSION || '1.0';
+const RUN_ID = __ENV.RUN_ID || `${Date.now()}`;
+
+function withApiVersion(url) {
+    // Avoid any ambiguity with Asp.Versioning defaults by always sending api-version explicitly.
+    return url.includes('?') ? `${url}&api-version=${API_VERSION}` : `${url}?api-version=${API_VERSION}`;
+}
+
+function resolveApiBase(adminToken) {
+    // Support multiple API base layouts depending on what is currently running (root, /api, /api/v1).
+    const candidates = [
+        {baseUrl: `${BASE_URL}/api`, useApiVersion: true},
+        {baseUrl: `${BASE_URL}/api/v1`, useApiVersion: false},
+        {baseUrl: `${BASE_URL}`, useApiVersion: false},
+    ];
+
+    for (const candidate of candidates) {
+        const probeUrl = candidate.useApiVersion
+            ? withApiVersion(`${candidate.baseUrl}/projects`)
+            : `${candidate.baseUrl}/projects`;
+
+        const res = http.get(probeUrl, {
+            headers: {'Authorization': `Bearer ${adminToken}`},
+            tags: {name: 'setup/probe-projects'},
+        });
+
+        // 404 means "route not found". Any other status implies the route exists.
+        if (res.status !== 404) {
+            console.log(`✓ Using API base: ${candidate.baseUrl} (api-version query: ${candidate.useApiVersion})`);
+            return candidate;
+        }
+    }
+
+    console.warn('⚠ Could not detect API base URL (all candidates returned 404), defaulting to /api with api-version.');
+    return {baseUrl: `${BASE_URL}/api`, useApiVersion: true};
+}
+
+function apiUrl(api, pathAndQuery) {
+    const url = `${api.baseUrl}${pathAndQuery}`;
+    return api.useApiVersion ? withApiVersion(url) : url;
+}
 
 function recordResult(res, success, isEvaluation = false) {
     featureFlagRequests.add(1);
@@ -81,13 +125,21 @@ export function setup() {
     const adminToken = JSON.parse(adminTokenResponse.body).token;
     console.log('✓ Admin token obtained');
 
+    const api = resolveApiBase(adminToken);
+
     // 3. Create test projects
     const projects = [];
-    const projectNames = ['K6-Load-Test-Project-1', 'K6-Load-Test-Project-2', 'K6-Load-Test-Project-3'];
+    const projectNames = [
+        `K6-Load-Test-Project-1-${RUN_ID}`,
+        `K6-Load-Test-Project-2-${RUN_ID}`,
+        `K6-Load-Test-Project-3-${RUN_ID}`
+    ];
+
+    let lastProjectFailure = null;
 
     for (const projectName of projectNames) {
         const projectResponse = http.post(
-            `${BASE_URL}/api/projects`,
+            apiUrl(api, '/projects'),
             JSON.stringify({
                 name: projectName,
                 description: `K6 load test project for multi-tenancy testing`
@@ -105,18 +157,25 @@ export function setup() {
             const project = JSON.parse(projectResponse.body);
             projects.push(project);
             console.log(`✓ Created project: ${project.name} (${project.id})`);
+        } else {
+            const bodyPreview = String(projectResponse.body).substring(0, 400);
+            console.error(`✗ Failed to create project '${projectName}'. Status: ${projectResponse.status}. Body: ${bodyPreview}`);
+            lastProjectFailure = {status: projectResponse.status, bodyPreview};
         }
     }
 
     if (projects.length === 0) {
-        throw new Error('Failed to create any test projects');
+        const extra = lastProjectFailure
+            ? ` Last failure: status=${lastProjectFailure.status}, body=${lastProjectFailure.bodyPreview}`
+            : '';
+        throw new Error(`Failed to create any test projects.${extra}`);
     }
 
     // 4. Create API keys for each project
     const apiKeys = [];
     for (const project of projects) {
         const apiKeyResponse = http.post(
-            `${BASE_URL}/api/projects/${project.id}/apikeys`,
+            apiUrl(api, `/projects/${project.id}/apikeys`),
             JSON.stringify({
                 name: `K6-Load-Test-Key-${project.name}`,
                 scopes: 'flags:read flags:write flags:delete'
@@ -138,6 +197,8 @@ export function setup() {
                 apiKey: apiKeyData.apiKey
             });
             console.log(`✓ Created API key for ${project.name}`);
+        } else {
+            console.error(`✗ Failed to create API key for project '${project.name}'. Status: ${apiKeyResponse.status}. Body: ${String(apiKeyResponse.body).substring(0, 200)}`);
         }
     }
 
@@ -159,12 +220,12 @@ export function setup() {
             });
 
             http.post(
-                `${BASE_URL}/feature-flags`,
+                apiUrl(api, '/feature-flags'),
                 flagPayload,
                 {
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-API-Key': keyData.apiKey
+                        'X-Api-Key': keyData.apiKey
                     },
                     tags: {name: 'setup/create-flags'}
                 }
@@ -182,13 +243,14 @@ export function setup() {
 
     return {
         adminToken,
+        api,
         apiKeys,
         testFlags
     };
 }
 
 export default function (data) {
-    const {adminToken, apiKeys, testFlags} = data;
+    const {adminToken, api, apiKeys, testFlags} = data;
 
     // Randomly select a project/API key for multi-tenant testing
     const keyData = apiKeys[Math.floor(Math.random() * apiKeys.length)];
@@ -207,9 +269,9 @@ export default function (data) {
             const userGroups = ['premium', 'beta-testers', 'early-adopters'][Math.floor(Math.random() * 3)];
 
             const res = http.get(
-                `${BASE_URL}/evaluation/${flagKey}?userId=${userId}&groups=${userGroups}`,
+                apiUrl(api, `/evaluation/${flagKey}?userId=${userId}&groups=${userGroups}`),
                 {
-                    headers: {'X-API-Key': apiKey},
+                    headers: {'X-Api-Key': apiKey},
                     tags: {name: 'evaluation', project: keyData.projectName}
                 }
             );
@@ -218,7 +280,7 @@ export default function (data) {
                 'evaluation status ok': (r) => r.status === 200 || r.status === 404,
                 'evaluation has result': (r) => {
                     try {
-                        return r.status === 200 && JSON.parse(r.body).enabled !== undefined;
+                        return r.status === 200 && JSON.parse(r.body).allowed !== undefined;
                     } catch {
                         return false;
                     }
@@ -229,9 +291,9 @@ export default function (data) {
         } else if (readType < 0.85) {
             // 25% - List all flags (pagination)
             const res = http.get(
-                `${BASE_URL}/feature-flags?first=20`,
+                apiUrl(api, '/feature-flags?first=20'),
                 {
-                    headers: {'X-API-Key': apiKey},
+                    headers: {'X-Api-Key': apiKey},
                     tags: {name: 'list-flags', project: keyData.projectName}
                 }
             );
@@ -253,9 +315,9 @@ export default function (data) {
             const flagKey = `${testFlags[Math.floor(Math.random() * testFlags.length)]}-${keyData.projectName}`;
 
             const res = http.get(
-                `${BASE_URL}/feature-flags/${flagKey}`,
+                apiUrl(api, `/feature-flags/${flagKey}`),
                 {
-                    headers: {'X-API-Key': apiKey},
+                    headers: {'X-Api-Key': apiKey},
                     tags: {name: 'get-flag', project: keyData.projectName}
                 }
             );
@@ -280,12 +342,12 @@ export default function (data) {
             });
 
             const res = http.post(
-                `${BASE_URL}/feature-flags`,
+                apiUrl(api, '/feature-flags'),
                 payload,
                 {
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-API-Key': apiKey
+                        'X-Api-Key': apiKey
                     },
                     tags: {name: 'create-flag', project: keyData.projectName}
                 }
@@ -306,13 +368,13 @@ export default function (data) {
                 parameters: []
             });
 
-            const res = http.put(
-                `${BASE_URL}/feature-flags/${flagKey}`,
+            const res = http.patch(
+                apiUrl(api, `/feature-flags/${flagKey}`),
                 payload,
                 {
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-API-Key': apiKey
+                        'X-Api-Key': apiKey
                     },
                     tags: {name: 'update-flag', project: keyData.projectName}
                 }
@@ -326,7 +388,7 @@ export default function (data) {
         }
     }
 
-    sleep(0.1); // Small delay to simulate realistic load
+    // sleep(0.01); // Small delay to simulate realistic load
 }
 
 export function teardown(data) {

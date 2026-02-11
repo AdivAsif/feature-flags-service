@@ -1,12 +1,24 @@
 using System.Security.Cryptography;
-using System.Text;
+using Web.Api.Extensions;
 
 namespace Web.Api.Middleware;
 
 public class ETagMiddleware(RequestDelegate next)
 {
+    private const long MaxBodyBytesToHash = 64 * 1024;
+    private static readonly PathString EvaluationPathPrefix = new("/api/evaluation");
+
     public async Task InvokeAsync(HttpContext context)
     {
+        // Avoid buffering/hashing for the hot-path evaluation endpoint.
+        // Evaluation responses are user-context dependent and typically not a good candidate for client-side ETags.
+        var endpoint = context.GetEndpoint();
+        if (endpoint?.Metadata.GetMetadata<DisableETagMetadata>() != null)
+        {
+            await next(context);
+            return;
+        }
+
         var originalBodyStream = context.Response.Body;
 
         using var memoryStream = new MemoryStream();
@@ -16,30 +28,31 @@ public class ETagMiddleware(RequestDelegate next)
 
         if (context.Response.StatusCode == StatusCodes.Status200OK &&
             context.Request.Method == HttpMethods.Get)
-        {
-            memoryStream.Position = 0;
-            var responseBody = await new StreamReader(memoryStream).ReadToEndAsync();
-            var etag = GenerateETag(responseBody);
-
-            context.Response.Headers.ETag = etag;
-
-            if (context.Request.Headers.TryGetValue("If-None-Match", out var incomingEtag) &&
-                incomingEtag == etag)
+            if (memoryStream.Length <= MaxBodyBytesToHash)
             {
-                context.Response.StatusCode = StatusCodes.Status304NotModified;
-                context.Response.ContentLength = 0;
-                await originalBodyStream.FlushAsync();
-                return;
+                memoryStream.Position = 0;
+                var etag = GenerateETag(memoryStream);
+
+                context.Response.Headers.ETag = etag;
+
+                if (context.Request.Headers.TryGetValue("If-None-Match", out var incomingEtag) &&
+                    incomingEtag == etag)
+                {
+                    context.Response.StatusCode = StatusCodes.Status304NotModified;
+                    context.Response.ContentLength = 0;
+                    await originalBodyStream.FlushAsync(context.RequestAborted);
+                    return;
+                }
             }
-        }
 
         memoryStream.Position = 0;
-        await memoryStream.CopyToAsync(originalBodyStream);
+        await memoryStream.CopyToAsync(originalBodyStream, context.RequestAborted);
     }
 
-    private static string GenerateETag(string content)
+    private static string GenerateETag(Stream contentStream)
     {
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(content));
+        using var sha = SHA256.Create();
+        var hash = sha.ComputeHash(contentStream);
         return $"\"{Convert.ToBase64String(hash)}\"";
     }
 }

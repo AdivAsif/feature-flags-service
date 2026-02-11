@@ -1,131 +1,145 @@
-﻿using Domain;
+﻿using Application.Interfaces.Repositories;
+using Domain;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Infrastructure.Repositories;
 
-public sealed class FeatureFlagsRepository(FeatureFlagsDbContext dbContext) : IKeyedRepository<FeatureFlag>
+public sealed class FeatureFlagsRepository(IDbContextFactory<FeatureFlagsDbContext> contextFactory)
+    : BaseRepository<FeatureFlagsDbContext>(contextFactory), IFeatureFlagRepository
 {
+    private static readonly Func<FeatureFlagsDbContext, Guid, string, CancellationToken, Task<FeatureFlag?>>
+        GetByKeyCompiledQuery =
+            EF.CompileAsyncQuery((FeatureFlagsDbContext db, Guid projectId, string key, CancellationToken ct) =>
+                db.FeatureFlags
+                    .AsNoTracking()
+                    .FirstOrDefault(ff => ff.ProjectId == projectId && ff.Key == key)
+            );
+
     // GET
-    public async Task<FeatureFlag?> GetByIdAsync(Guid id)
+    public Task<FeatureFlag?> GetByIdAsync(Guid projectId, Guid id, CancellationToken cancellationToken = default)
     {
-        return await dbContext.FeatureFlags.FindAsync(id);
+        return ExecuteAsync(db => db.FeatureFlags
+                .AsNoTracking()
+                .FirstOrDefaultAsync(ff => ff.ProjectId == projectId && ff.Id == id, cancellationToken),
+            cancellationToken);
     }
 
-    public async Task<FeatureFlag?> GetByKeyAsync(string key)
+    public Task<FeatureFlag?> GetByKeyAsync(Guid projectId, string key, CancellationToken cancellationToken = default)
     {
-        return await dbContext.FeatureFlags.AsNoTracking().FirstOrDefaultAsync(ff => ff.Key == key);
+        return ExecuteAsync(db => GetByKeyCompiledQuery(db, projectId, key, cancellationToken), cancellationToken);
     }
 
-    public async Task<FeatureFlag?> GetByKeyAsync(Guid projectId, string key)
+    public Task<PagedResult<FeatureFlag>> GetPagedAsync(
+        Guid projectId,
+        int first = 10,
+        string? after = null,
+        string? before = null,
+        CancellationToken cancellationToken = default)
     {
-        return await dbContext.FeatureFlags.AsNoTracking()
-            .FirstOrDefaultAsync(ff => ff.ProjectId == projectId && ff.Key == key);
-    }
+        return ExecuteAsync(async db =>
+        {
+            first = Math.Clamp(first, 1, 100);
 
-    public async Task<IEnumerable<FeatureFlag>> GetAllAsync(int? take, int? skip)
-    {
-        return await dbContext.FeatureFlags.AsNoTracking().ToListAsync();
-    }
+            var query = db.FeatureFlags.AsNoTracking();
 
-    public async Task<PagedResult<FeatureFlag>> GetPagedAsync(int first = 10, string? after = null,
-        string? before = null)
-    {
-        return await GetPagedAsync(Guid.Empty, first, after, before);
+            if (projectId != Guid.Empty)
+                query = query.Where(ff => ff.ProjectId == projectId);
+
+            query = query.OrderBy(ff => ff.CreatedAt).ThenBy(ff => ff.Id);
+
+            if (!string.IsNullOrWhiteSpace(after) &&
+                CursorHelper.TryDecodeCursor(after, out var afterId, out var afterCreatedAt))
+                query = query
+                    .Where(ff => ff.CreatedAt > afterCreatedAt || (ff.CreatedAt == afterCreatedAt && ff.Id > afterId))
+                    .OrderBy(ff => ff.CreatedAt)
+                    .ThenBy(ff => ff.Id);
+            else if (!string.IsNullOrWhiteSpace(before) &&
+                     CursorHelper.TryDecodeCursor(before, out var beforeId, out var beforeCreatedAt))
+                query = query
+                    .Where(ff =>
+                        ff.CreatedAt < beforeCreatedAt || (ff.CreatedAt == beforeCreatedAt && ff.Id < beforeId))
+                    .OrderByDescending(ff => ff.CreatedAt)
+                    .ThenByDescending(ff => ff.Id);
+
+            var items = await query.Take(first + 1).ToListAsync(cancellationToken);
+
+            var hasNextPage = items.Count > first;
+            if (hasNextPage) items = items.Take(first).ToList();
+
+            if (!string.IsNullOrWhiteSpace(before)) items.Reverse();
+
+            var totalCount = projectId != Guid.Empty
+                ? await db.FeatureFlags.CountAsync(ff => ff.ProjectId == projectId, cancellationToken)
+                : await db.FeatureFlags.CountAsync(cancellationToken);
+
+            var startCursor = items.Count > 0
+                ? CursorHelper.EncodeCursor(items.First().Id, items.First().CreatedAt)
+                : null;
+            var endCursor = items.Count > 0 ? CursorHelper.EncodeCursor(items.Last().Id, items.Last().CreatedAt) : null;
+
+            var hasPreviousPage =
+                !string.IsNullOrWhiteSpace(after) || (!string.IsNullOrWhiteSpace(before) && hasNextPage);
+
+            return new PagedResult<FeatureFlag>
+            {
+                Items = items,
+                PageInfo = new PageInfo
+                {
+                    HasNextPage = string.IsNullOrWhiteSpace(before) && hasNextPage,
+                    HasPreviousPage = hasPreviousPage,
+                    StartCursor = startCursor,
+                    EndCursor = endCursor,
+                    TotalCount = totalCount
+                }
+            };
+        }, cancellationToken);
     }
 
     // CREATE
-    public async Task<FeatureFlag> CreateAsync(FeatureFlag featureFlag)
+    public Task<FeatureFlag> CreateAsync(FeatureFlag featureFlag, CancellationToken cancellationToken = default)
     {
-        await dbContext.FeatureFlags.AddAsync(featureFlag);
-        await dbContext.SaveChangesAsync();
-        return featureFlag;
+        return ExecuteAsync(async db =>
+        {
+            await db.FeatureFlags.AddAsync(featureFlag, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            return featureFlag;
+        }, cancellationToken);
     }
 
     // UPDATE
-    public async Task<FeatureFlag> UpdateAsync(FeatureFlag featureFlag)
+    public Task<FeatureFlag> UpdateAsync(FeatureFlag featureFlag, CancellationToken cancellationToken = default)
     {
-        dbContext.Entry(featureFlag).State = EntityState.Modified;
-        // dbContext.FeatureFlags.Update(featureFlag);
-        await dbContext.SaveChangesAsync();
-        return featureFlag;
+        return ExecuteAsync(async db =>
+        {
+            db.Entry(featureFlag).State = EntityState.Modified;
+            await db.SaveChangesAsync(cancellationToken);
+            return featureFlag;
+        }, cancellationToken);
     }
 
     // DELETE
-    public async Task DeleteAsync(Guid id)
+    public Task DeleteAsync(Guid projectId, Guid id, CancellationToken cancellationToken = default)
     {
-        var featureFlag = await dbContext.FeatureFlags.FindAsync(id);
-        if (featureFlag == null) return;
-        dbContext.FeatureFlags.Remove(featureFlag);
-        await dbContext.SaveChangesAsync();
-    }
-
-    public async Task<FeatureFlag?> GetByIdAsync(Guid projectId, Guid id)
-    {
-        return await dbContext.FeatureFlags.AsNoTracking()
-            .FirstOrDefaultAsync(ff => ff.ProjectId == projectId && ff.Id == id);
-    }
-
-    public async Task<IEnumerable<FeatureFlag>> GetAllAsync(Guid projectId, int? take, int? skip)
-    {
-        return await dbContext.FeatureFlags.AsNoTracking()
-            .Where(ff => ff.ProjectId == projectId)
-            .ToListAsync();
-    }
-
-    public async Task<PagedResult<FeatureFlag>> GetPagedAsync(Guid projectId, int first = 10, string? after = null,
-        string? before = null)
-    {
-        first = Math.Clamp(first, 1, 100);
-
-        var query = dbContext.FeatureFlags.AsNoTracking();
-
-        if (projectId != Guid.Empty)
-            query = query.Where(ff => ff.ProjectId == projectId);
-
-        query = query.OrderBy(ff => ff.CreatedAt).ThenBy(ff => ff.Id);
-
-        if (!string.IsNullOrWhiteSpace(after) &&
-            CursorHelper.TryDecodeCursor(after, out var afterId, out var afterCreatedAt))
-            query = query
-                .Where(ff => ff.CreatedAt > afterCreatedAt || (ff.CreatedAt == afterCreatedAt && ff.Id > afterId))
-                .OrderBy(ff => ff.CreatedAt)
-                .ThenBy(ff => ff.Id);
-        else if (!string.IsNullOrWhiteSpace(before) &&
-                 CursorHelper.TryDecodeCursor(before, out var beforeId, out var beforeCreatedAt))
-            query = query
-                .Where(ff => ff.CreatedAt < beforeCreatedAt || (ff.CreatedAt == beforeCreatedAt && ff.Id < beforeId))
-                .OrderByDescending(ff => ff.CreatedAt)
-                .ThenByDescending(ff => ff.Id);
-
-        var items = await query.Take(first + 1).ToListAsync();
-
-        var hasNextPage = items.Count > first;
-        if (hasNextPage) items = items.Take(first).ToList();
-
-        if (!string.IsNullOrWhiteSpace(before)) items.Reverse();
-
-        var totalCount = projectId != Guid.Empty
-            ? await dbContext.FeatureFlags.CountAsync(ff => ff.ProjectId == projectId)
-            : await dbContext.FeatureFlags.CountAsync();
-
-        var startCursor = items.Count > 0 ? CursorHelper.EncodeCursor(items.First().Id, items.First().CreatedAt) : null;
-        var endCursor = items.Count > 0 ? CursorHelper.EncodeCursor(items.Last().Id, items.Last().CreatedAt) : null;
-
-        var hasPreviousPage = !string.IsNullOrWhiteSpace(after) || (!string.IsNullOrWhiteSpace(before) && hasNextPage);
-
-        return new PagedResult<FeatureFlag>
+        return ExecuteAsync(async db =>
         {
-            Items = items,
-            PageInfo = new PageInfo
+            if (db.Database.IsRelational())
             {
-                HasNextPage = string.IsNullOrWhiteSpace(before) && hasNextPage,
-                HasPreviousPage = hasPreviousPage,
-                StartCursor = startCursor,
-                EndCursor = endCursor,
-                TotalCount = totalCount
+                await db.FeatureFlags
+                    .Where(ff => ff.ProjectId == projectId && ff.Id == id)
+                    .ExecuteDeleteAsync(cancellationToken);
             }
-        };
+            else
+            {
+                var featureFlag = await db.FeatureFlags
+                    .FirstOrDefaultAsync(ff => ff.ProjectId == projectId && ff.Id == id, cancellationToken);
+                if (featureFlag != null)
+                {
+                    db.FeatureFlags.Remove(featureFlag);
+                    await db.SaveChangesAsync(cancellationToken);
+                }
+            }
+        }, cancellationToken);
     }
 }

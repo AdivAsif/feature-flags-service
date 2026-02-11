@@ -12,7 +12,7 @@ public class Delete : IEndpoint
             {
                 try
                 {
-                    logger.LogInformation("Deleting audit log with id: {ID}", id);
+                    logger.LogDebug("Deleting audit log with id: {ID}", id);
                     await auditLogsService.DeleteAsync(id);
                     return Results.NoContent();
                 }

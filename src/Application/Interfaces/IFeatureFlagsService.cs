@@ -4,21 +4,20 @@ namespace Application.Interfaces;
 
 public interface IFeatureFlagsService
 {
-    public Task<FeatureFlagDTO?> GetAsync(Guid projectId, Guid id);
-    public Task<FeatureFlagDTO?> GetByKeyAsync(Guid projectId, string key);
-    public Task<IEnumerable<FeatureFlagDTO>> GetAllAsync(Guid projectId, int? take = null, int? skip = null);
+    Task<FeatureFlagDto?> GetAsync(Guid projectId, Guid id, CancellationToken cancellationToken = default);
+    Task<FeatureFlagDto?> GetByKeyAsync(Guid projectId, string key, CancellationToken cancellationToken = default);
 
-    public Task<PagedDto<FeatureFlagDTO>> GetPagedAsync(Guid projectId, int first = 10, string? after = null,
-        string? before = null);
+    Task<PagedDto<FeatureFlagDto>> GetPagedAsync(Guid projectId, int first = 10, string? after = null,
+        string? before = null, CancellationToken cancellationToken = default);
 
-    public Task<FeatureFlagDTO> CreateAsync(Guid projectId, FeatureFlagDTO featureFlag,
+    Task<FeatureFlagDto> CreateAsync(Guid projectId, FeatureFlagDto featureFlag,
         string? performedByUserId = null,
-        string? performedByUserEmail = null);
+        string? performedByUserEmail = null, CancellationToken cancellationToken = default);
 
-    public Task<FeatureFlagDTO> UpdateAsync(Guid projectId, string key, FeatureFlagDTO featureFlag,
+    Task<FeatureFlagDto> UpdateAsync(Guid projectId, string key, FeatureFlagDto featureFlag,
         string? performedByUserId = null,
-        string? performedByUserEmail = null);
+        string? performedByUserEmail = null, CancellationToken cancellationToken = default);
 
-    public Task DeleteByKeyAsync(Guid projectId, string key, string? performedByUserId = null,
-        string? performedByUserEmail = null);
+    Task DeleteByKeyAsync(Guid projectId, string key, string? performedByUserId = null,
+        string? performedByUserEmail = null, CancellationToken cancellationToken = default);
 }

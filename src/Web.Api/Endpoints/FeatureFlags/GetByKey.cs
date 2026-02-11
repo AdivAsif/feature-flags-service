@@ -23,7 +23,7 @@ public class GetByKey : IEndpoint
                             return Results.Unauthorized();
                         }
 
-                        logger.LogInformation("Getting feature flag by key: {Key} for project: {ProjectId}", key,
+                        logger.LogDebug("Getting feature flag by key: {Key} for project: {ProjectId}", key,
                             projectId);
                         var featureFlag = await featureFlagsService.GetByKeyAsync(projectId.Value, key);
 

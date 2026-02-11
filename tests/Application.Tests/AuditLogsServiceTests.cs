@@ -21,50 +21,6 @@ public class AuditLogsServiceTests
         _service = new AuditLogsService(_repository, mapper);
     }
 
-    #region GetAllAsync Tests
-
-    [Fact]
-    public async Task GetAllAsync_ShouldReturnAllAuditLogs()
-    {
-        // Arrange
-        var featureFlagId = Guid.NewGuid();
-        var auditLogs = new List<AuditLog>
-        {
-            new()
-            {
-                Id = Guid.NewGuid(),
-                FeatureFlagId = featureFlagId,
-                Action = AuditLogAction.Create,
-                NewStateJson = "{\"enabled\":true}",
-                CreatedAt = DateTime.UtcNow,
-                PerformedByUserId = "user1",
-                PerformedByUserEmail = "user1@example.com"
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                FeatureFlagId = featureFlagId,
-                Action = AuditLogAction.Update,
-                PreviousStateJson = "{\"enabled\":true}",
-                NewStateJson = "{\"enabled\":false}",
-                CreatedAt = DateTime.UtcNow,
-                PerformedByUserId = "user2",
-                PerformedByUserEmail = "user2@example.com"
-            }
-        };
-        _repository.GetAllAsync().Returns(auditLogs);
-
-        // Act
-        var result = await _service.GetAllAsync();
-
-        // Assert
-        result.Should().HaveCount(2);
-        result.Should().Contain(a => a.Action == AuditLogAction.Create);
-        result.Should().Contain(a => a.Action == AuditLogAction.Update);
-    }
-
-    #endregion
-
     #region GetPagedAsync Tests
 
     [Fact]
@@ -166,7 +122,7 @@ public class AuditLogsServiceTests
     {
         // Arrange
         var featureFlagId = Guid.NewGuid();
-        var dto = new AuditLogDTO
+        var dto = new AuditLogDto
         {
             FeatureFlagId = featureFlagId,
             Action = AuditLogAction.Create,
@@ -197,7 +153,7 @@ public class AuditLogsServiceTests
     {
         // Arrange
         var featureFlagId = Guid.NewGuid();
-        var dto = new AuditLogDTO
+        var dto = new AuditLogDto
         {
             FeatureFlagId = featureFlagId,
             Action = AuditLogAction.Delete,
@@ -228,7 +184,7 @@ public class AuditLogsServiceTests
     {
         // Arrange
         var featureFlagId = Guid.NewGuid();
-        var dto = new AuditLogDTO
+        var dto = new AuditLogDto
         {
             FeatureFlagId = featureFlagId,
             Action = AuditLogAction.Update,
@@ -261,7 +217,7 @@ public class AuditLogsServiceTests
     public async Task AppendAsync_WithNoStateJson_ShouldThrowBadRequestException()
     {
         // Arrange
-        var dto = new AuditLogDTO
+        var dto = new AuditLogDto
         {
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Create,

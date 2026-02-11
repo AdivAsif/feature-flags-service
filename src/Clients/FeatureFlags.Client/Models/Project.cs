@@ -1,4 +1,4 @@
-namespace FeatureFlags.Client;
+namespace FeatureFlags.Client.Models;
 
 public sealed class Project : DtoBase
 {

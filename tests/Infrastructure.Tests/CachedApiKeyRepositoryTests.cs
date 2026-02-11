@@ -1,6 +1,9 @@
+using Application.Interfaces.Repositories;
 using Domain;
 using FluentAssertions;
 using Infrastructure.Repositories;
+using Infrastructure.Services;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 using ZiggyCreatures.Caching.Fusion;
 
@@ -9,27 +12,29 @@ namespace Infrastructure.Tests;
 public class CachedApiKeyRepositoryTests
 {
     private readonly IFusionCache _cache;
-    private readonly CachedApiKeyRepository _cachedRepository;
+    private readonly CachedApiKeyRepository _cachedApiKeyRepository;
     private readonly IApiKeyRepository _innerRepository;
 
     public CachedApiKeyRepositoryTests()
     {
         _innerRepository = Substitute.For<IApiKeyRepository>();
         _cache = Substitute.For<IFusionCache>();
-        _cachedRepository = new CachedApiKeyRepository(_innerRepository, _cache);
+        var logger = Substitute.For<ILogger<ApiKeyUsageQueue>>();
+        var usageQueue = new ApiKeyUsageQueue(logger);
+        _cachedApiKeyRepository = new CachedApiKeyRepository(_innerRepository, _cache, usageQueue);
     }
 
     [Fact]
-    public async Task UpdateLastUsedAtAsync_ShouldDelegateToInnerRepository()
+    public async Task UpdateLastUsedAtAsync_ShouldQueueForBackgroundProcessing()
     {
         // Arrange
         var apiKeyId = Guid.NewGuid();
 
         // Act
-        await _cachedRepository.UpdateLastUsedAtAsync(apiKeyId);
+        await _cachedApiKeyRepository.UpdateLastUsedAtAsync(apiKeyId);
 
-        // Assert
-        await _innerRepository.Received(1).UpdateLastUsedAtAsync(apiKeyId, Arg.Any<CancellationToken>());
+        // Assert - Should NOT call inner repository directly (queued for background processing)
+        await _innerRepository.DidNotReceive().UpdateLastUsedAtAsync(apiKeyId, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -49,19 +54,19 @@ public class CachedApiKeyRepositoryTests
         _innerRepository.GetByIdAsync(apiKey.Id, Arg.Any<CancellationToken>()).Returns(apiKey);
 
         // Act
-        await _cachedRepository.RevokeAsync(apiKey.Id);
+        await _cachedApiKeyRepository.RevokeAsync(apiKey.Id);
 
         // Assert
         await _innerRepository.Received(1).GetByIdAsync(apiKey.Id, Arg.Any<CancellationToken>());
         await _innerRepository.Received(1).RevokeAsync(apiKey.Id, Arg.Any<CancellationToken>());
 
         await _cache.Received().RemoveAsync(
-            Arg.Is<string>(k => k == $"ApiKey:hash:{apiKey.KeyHash}"),
+            Arg.Is<string>(k => k == $"apikey:{apiKey.KeyHash}"),
             Arg.Any<FusionCacheEntryOptions?>(),
             Arg.Any<CancellationToken>());
 
         await _cache.Received().RemoveAsync(
-            Arg.Is<string>(k => k == $"ApiKey:project:{apiKey.ProjectId}"),
+            Arg.Is<string>(k => k == $"apikey:project:{apiKey.ProjectId}"),
             Arg.Any<FusionCacheEntryOptions?>(),
             Arg.Any<CancellationToken>());
 

@@ -31,7 +31,7 @@ public class AuditLogBackgroundServiceTests
 
         var backgroundService = new AuditLogBackgroundService(queue, serviceProvider, logger);
 
-        var auditLog = new AuditLogDTO
+        var auditLog = new AuditLogDto
         {
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Create,
@@ -41,7 +41,7 @@ public class AuditLogBackgroundServiceTests
             PerformedByUserEmail = "user@example.com"
         };
 
-        auditLogsService.AppendAsync(Arg.Any<AuditLogDTO>())
+        auditLogsService.AppendAsync(Arg.Any<AuditLogDto>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(auditLog));
 
         // Act
@@ -58,9 +58,9 @@ public class AuditLogBackgroundServiceTests
         await backgroundService.StopAsync(CancellationToken.None);
 
         // Assert
-        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogDTO>(a =>
+        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogDto>(a =>
             a.FeatureFlagId == auditLog.FeatureFlagId &&
-            a.Action == AuditLogAction.Create));
+            a.Action == AuditLogAction.Create), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public class AuditLogBackgroundServiceTests
 
         var backgroundService = new AuditLogBackgroundService(queue, serviceProvider, logger);
 
-        var auditLog = new AuditLogDTO
+        var auditLog = new AuditLogDto
         {
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Create,
@@ -94,8 +94,8 @@ public class AuditLogBackgroundServiceTests
         };
 
         // Make the service throw an exception
-        auditLogsService.AppendAsync(Arg.Any<AuditLogDTO>())
-            .Returns<AuditLogDTO>(_ => throw new Exception("Test exception"));
+        auditLogsService.AppendAsync(Arg.Any<AuditLogDto>(), Arg.Any<CancellationToken>())
+            .Returns<AuditLogDto>(_ => throw new Exception("Test exception"));
 
         // Act
         await queue.QueueAuditLogAsync(auditLog);
@@ -114,7 +114,7 @@ public class AuditLogBackgroundServiceTests
 
         // Assert - should handle exception gracefully
         await act.Should().NotThrowAsync();
-        await auditLogsService.Received(1).AppendAsync(Arg.Any<AuditLogDTO>());
+        await auditLogsService.Received(1).AppendAsync(Arg.Any<AuditLogDto>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -137,7 +137,7 @@ public class AuditLogBackgroundServiceTests
 
         var backgroundService = new AuditLogBackgroundService(queue, serviceProvider, logger);
 
-        var auditLog1 = new AuditLogDTO
+        var auditLog1 = new AuditLogDto
         {
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Create,
@@ -147,7 +147,7 @@ public class AuditLogBackgroundServiceTests
             PerformedByUserEmail = "user1@example.com"
         };
 
-        var auditLog2 = new AuditLogDTO
+        var auditLog2 = new AuditLogDto
         {
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Update,
@@ -158,8 +158,8 @@ public class AuditLogBackgroundServiceTests
             PerformedByUserEmail = "user2@example.com"
         };
 
-        auditLogsService.AppendAsync(Arg.Any<AuditLogDTO>())
-            .Returns(x => Task.FromResult(x.Arg<AuditLogDTO>()));
+        auditLogsService.AppendAsync(Arg.Any<AuditLogDto>(), Arg.Any<CancellationToken>())
+            .Returns(x => Task.FromResult(x.Arg<AuditLogDto>()));
 
         // Act
         await queue.QueueAuditLogAsync(auditLog1);
@@ -176,6 +176,6 @@ public class AuditLogBackgroundServiceTests
         await backgroundService.StopAsync(CancellationToken.None);
 
         // Assert
-        await auditLogsService.Received(2).AppendAsync(Arg.Any<AuditLogDTO>());
+        await auditLogsService.Received(2).AppendAsync(Arg.Any<AuditLogDto>(), Arg.Any<CancellationToken>());
     }
 }

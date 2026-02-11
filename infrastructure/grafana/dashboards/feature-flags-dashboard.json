@@ -18,10 +18,22 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": null,
+  "id": 0,
   "links": [],
-  "liveNow": false,
   "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 9,
+      "panels": [],
+      "title": "API Request Metrics",
+      "type": "row"
+    },
     {
       "datasource": {
         "type": "prometheus",
@@ -33,19 +45,22 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 10,
             "gradientMode": "none",
             "hideFrom": {
+              "legend": false,
               "tooltip": false,
-              "viz": false,
-              "legend": false
+              "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -53,6 +68,7 @@
               "type": "linear"
             },
             "showPoints": "never",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -68,7 +84,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -84,7 +100,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 0
+        "y": 1
       },
       "id": 1,
       "options": {
@@ -95,10 +111,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.3.2",
       "targets": [
         {
           "datasource": {
@@ -106,8 +124,8 @@
             "uid": "prometheus"
           },
           "expr": "rate(http_requests_received_total{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"}[1m])",
-          "refId": "A",
-          "legendFormat": "{{method}} {{code}}"
+          "legendFormat": "{{method}} {{code}}",
+          "refId": "A"
         }
       ],
       "title": "Request Rate (req/s)",
@@ -129,7 +147,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -143,24 +161,27 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 5,
         "x": 12,
-        "y": 0
+        "y": 1
       },
       "id": 2,
       "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
-          "values": false,
           "calcs": [
             "lastNotNull"
           ],
-          "fields": ""
+          "fields": "",
+          "values": false
         },
         "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "showThresholdMarkers": true,
+        "sizing": "auto"
       },
-      "pluginVersion": "10.0.0",
+      "pluginVersion": "12.3.2",
       "targets": [
         {
           "datasource": {
@@ -182,22 +203,149 @@
       "fieldConfig": {
         "defaults": {
           "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 7,
+        "x": 17,
+        "y": 1
+      },
+      "id": 8,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(http_requests_received_total{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"}[1h]))",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Requests (Last Hour)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 7,
+        "x": 17,
+        "y": 5
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(http_requests_in_progress{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Requests In Progress",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 10,
             "gradientMode": "none",
             "hideFrom": {
+              "legend": false,
               "tooltip": false,
-              "viz": false,
-              "legend": false
+              "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -205,6 +353,7 @@
               "type": "linear"
             },
             "showPoints": "never",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -220,7 +369,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           },
@@ -229,10 +378,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 12,
         "w": 12,
         "x": 0,
-        "y": 8
+        "y": 9
       },
       "id": 3,
       "options": {
@@ -243,40 +392,54 @@
           ],
           "displayMode": "table",
           "placement": "right",
-          "showLegend": true
+          "showLegend": true,
+          "sortBy": "Max",
+          "sortDesc": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.3.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"}[5m])) by (le, method, endpoint))",
-          "refId": "A",
-          "legendFormat": "p95 {{method}} {{endpoint}}"
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "histogram_quantile(\r\n  0.95,\r\n  sum by (le, method, endpoint) (\r\n    rate(http_request_duration_seconds_bucket{\r\n      job=\"feature-flags-service\",\r\n      code=~\"2..\",\r\n      endpoint=~\"^/api/.*\"\r\n    }[5m])\r\n  )\r\n)",
+          "format": "time_series",
+          "instant": false,
+          "interval": "",
+          "legendFormat": "p95 {{method}} {{endpoint}}",
+          "range": true,
+          "refId": "A"
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"}[5m])) by (le, method, endpoint))",
-          "refId": "B",
-          "legendFormat": "p99 {{method}} {{endpoint}}"
+          "editorMode": "code",
+          "expr": "histogram_quantile(\r\n  0.99,\r\n  sum by (le, method, endpoint) (\r\n    rate(http_request_duration_seconds_bucket{\r\n      job=\"feature-flags-service\",\r\n      code=~\"2..\",\r\n      endpoint=~\"^/api/.*\"\r\n    }[5m])\r\n  )\r\n)",
+          "legendFormat": "p99 {{method}} {{endpoint}}",
+          "range": true,
+          "refId": "B"
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"}[5m])) by (le, method, endpoint))",
-          "refId": "C",
-          "legendFormat": "p50 {{method}} {{endpoint}}"
+          "editorMode": "code",
+          "expr": "histogram_quantile(\r\n  0.50,\r\n  sum by (le, method, endpoint) (\r\n    rate(http_request_duration_seconds_bucket{\r\n      job=\"feature-flags-service\",\r\n      code=~\"2..\",\r\n      endpoint=~\"^/api/.*\"\r\n    }[5m])\r\n  )\r\n)",
+          "legendFormat": "p50 {{method}} {{endpoint}}",
+          "range": true,
+          "refId": "C"
         }
       ],
       "title": "Response Time Percentiles (p50, p95, p99)",
@@ -294,9 +457,9 @@
           },
           "custom": {
             "hideFrom": {
+              "legend": false,
               "tooltip": false,
-              "viz": false,
-              "legend": false
+              "viz": false
             }
           },
           "mappings": []
@@ -304,10 +467,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
+        "h": 12,
+        "w": 5,
         "x": 12,
-        "y": 8
+        "y": 9
       },
       "id": 4,
       "options": {
@@ -320,20 +483,32 @@
           ]
         },
         "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "sort": "desc",
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.3.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (code) (rate(http_requests_received_total{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"}[5m]))",
-          "refId": "A",
-          "legendFormat": "{{code}}"
+          "editorMode": "code",
+          "expr": "sum by (code) (rate(http_requests_received_total{job=\"feature-flags-service\",endpoint=~\"^/api/.*\"}[5m]))",
+          "legendFormat": "{{code}}",
+          "range": true,
+          "refId": "A"
         }
       ],
       "title": "HTTP Status Codes Distribution",
@@ -355,7 +530,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "yellow",
@@ -372,25 +547,28 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 16
+        "h": 6,
+        "w": 7,
+        "x": 17,
+        "y": 9
       },
       "id": 5,
       "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
-          "values": false,
           "calcs": [
             "lastNotNull"
           ],
-          "fields": ""
+          "fields": "",
+          "values": false
         },
         "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "showThresholdMarkers": true,
+        "sizing": "auto"
       },
-      "pluginVersion": "10.0.0",
+      "pluginVersion": "12.3.2",
       "targets": [
         {
           "datasource": {
@@ -420,7 +598,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "yellow",
@@ -437,25 +615,28 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 16
+        "h": 6,
+        "w": 7,
+        "x": 17,
+        "y": 15
       },
       "id": 6,
       "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
-          "values": false,
           "calcs": [
             "lastNotNull"
           ],
-          "fields": ""
+          "fields": "",
+          "values": false
         },
         "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "showThresholdMarkers": true,
+        "sizing": "auto"
       },
-      "pluginVersion": "10.0.0",
+      "pluginVersion": "12.3.2",
       "targets": [
         {
           "datasource": {
@@ -470,63 +651,17 @@
       "type": "gauge"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
+      "collapsed": false,
       "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 16
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 21
       },
-      "id": 7,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(http_requests_in_progress{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"})",
-          "refId": "A"
-        }
-      ],
-      "title": "Requests In Progress",
-      "type": "stat"
+      "id": 10,
+      "panels": [],
+      "title": "Cache Metrics",
+      "type": "row"
     },
     {
       "datasource": {
@@ -536,7 +671,41 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
@@ -544,52 +713,220 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
               }
             ]
-          },
-          "unit": "short"
+          }
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 16
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 22
       },
-      "id": 8,
+      "id": 11,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "textMode": "auto"
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
       },
-      "pluginVersion": "10.0.0",
+      "pluginVersion": "12.3.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(http_requests_received_total{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"}[1h]))",
+          "editorMode": "builder",
+          "expr": "fusion_cache_hits_total{level=\"l1\"}",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "L1 Cache Total Hits",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "builder",
+          "expr": "fusion_cache_hits_total{level=\"l2\"}",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "L2 Cache Total Hits",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "builder",
+          "expr": "fusion_cache_misses_total{level=\"l1\"}",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "L1 Cache Total Misses",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "builder",
+          "expr": "fusion_cache_misses_total{level=\"l2\"}",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "L2 Cache Total Misses",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "builder",
+          "expr": "fusion_cache_hits_total{state=\"fresh\"}",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "Cache Total Fresh Hits",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "builder",
+          "expr": "fusion_cache_hits_total{state=\"stale\"}",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "Cache Total Stale Hits",
+          "range": true,
+          "refId": "F"
+        }
+      ],
+      "title": "Fusion Cache Hits/Misses",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 22
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.2",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(\r\n  0.95,\r\n  sum(rate(fusion_cache_redis_latency_ms_bucket[5m])) by (le)\r\n)",
+          "legendFormat": "p95 Latency",
+          "range": true,
           "refId": "A"
         }
       ],
-      "title": "Total Requests (Last Hour)",
-      "type": "stat"
+      "title": "Redis latency",
+      "type": "timeseries"
     }
   ],
-  "schemaVersion": 38,
-  "style": "dark",
+  "preload": false,
+  "refresh": "auto",
+  "schemaVersion": 42,
   "tags": [
     "feature-flags",
     "api",
@@ -599,13 +936,12 @@
     "list": []
   },
   "time": {
-    "from": "now-15m",
+    "from": "now-5m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Feature Flags Service - Performance Dashboard",
   "uid": "feature-flags-dashboard",
-  "version": 1,
-  "weekStart": ""
+  "version": 5
 }
