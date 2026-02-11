@@ -29,6 +29,16 @@ export const options = {
 const BASE_URL = __ENV.BASE_URL || 'http://host.docker.internal:5000';
 const TOKEN = __ENV.AUTH_TOKEN || '';
 
+function recordResult(res, success) {
+    featureFlagRequests.add(1);
+    featureFlagErrors.add(!success);
+
+    const duration = res?.timings?.duration;
+    if (Number.isFinite(duration) && duration >= 0) {
+        featureFlagDuration.add(duration);
+    }
+}
+
 function getHeaders() {
     const headers = {
         'Content-Type': 'application/json',
@@ -45,7 +55,7 @@ export function setup() {
     console.log(`Running k6 read-heavy test against: ${BASE_URL}`);
     console.log(`Testing health endpoint first...`);
 
-    const healthCheck = http.get(`${BASE_URL}/health`);
+    const healthCheck = http.get(`${BASE_URL}/health`, {tags: {name: 'setup/health'}});
     console.log(`Health check status: ${healthCheck.status}`);
 
     if (healthCheck.status !== 200) {
@@ -65,6 +75,7 @@ export function setup() {
             }),
             {
                 headers: {'Content-Type': 'application/json'},
+                tags: {name: 'setup/dev-token'},
             }
         );
 
@@ -96,9 +107,6 @@ export default function (data) {
         if (readType < 0.5) {
             // Get all feature flags with pagination
             const res = http.get(`${BASE_URL}/feature-flags?first=20`, {headers});
-            
-            featureFlagRequests.add(1);
-            featureFlagDuration.add(res.timings.duration);
 
             const success = check(res, {
                 'status is 200': (r) => r.status === 200,
@@ -112,7 +120,9 @@ export default function (data) {
             });
 
             if (!success) {
-                featureFlagErrors.add(1);
+                recordResult(res, false);
+            } else {
+                recordResult(res, true);
             }
         } else if (readType < 0.8) {
             // Evaluate common flags (high cache hit rate)
@@ -120,34 +130,24 @@ export default function (data) {
             const randomKey = flagKeys[Math.floor(Math.random() * flagKeys.length)];
             
             const res = http.get(`${BASE_URL}/evaluation/${randomKey}`, {headers});
-            
-            featureFlagRequests.add(1);
-            featureFlagDuration.add(res.timings.duration);
 
             const success = check(res, {
                 'evaluation completed': (r) => r.status === 200 || r.status === 404,
             });
 
-            if (!success) {
-                featureFlagErrors.add(1);
-            }
+            recordResult(res, success);
         } else {
             // Get specific flag by key
             const flagKeys = ['test-flag', 'feature-a', 'feature-b'];
             const randomKey = flagKeys[Math.floor(Math.random() * flagKeys.length)];
             
             const res = http.get(`${BASE_URL}/feature-flags/${randomKey}`, {headers});
-            
-            featureFlagRequests.add(1);
-            featureFlagDuration.add(res.timings.duration);
 
             const success = check(res, {
                 'get by key completed': (r) => r.status === 200 || r.status === 404,
             });
 
-            if (!success) {
-                featureFlagErrors.add(1);
-            }
+            recordResult(res, success);
         }
     } else {
         // Minimal write operations to keep cache fresh
@@ -160,16 +160,11 @@ export default function (data) {
 
         const res = http.post(`${BASE_URL}/feature-flags`, payload, {headers});
 
-        featureFlagRequests.add(1);
-        featureFlagDuration.add(res.timings.duration);
-
         const success = check(res, {
             'create status is 200 or 201': (r) => r.status === 200 || r.status === 201,
         });
 
-        if (!success) {
-            featureFlagErrors.add(1);
-        }
+        recordResult(res, success);
     }
 }
 

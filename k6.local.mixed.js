@@ -29,6 +29,16 @@ export const options = {
 const BASE_URL = __ENV.BASE_URL || 'http://host.docker.internal:5000';
 const TOKEN = __ENV.AUTH_TOKEN || '';
 
+function recordResult(res, success) {
+    featureFlagRequests.add(1);
+    featureFlagErrors.add(!success);
+
+    const duration = res?.timings?.duration;
+    if (Number.isFinite(duration) && duration >= 0) {
+        featureFlagDuration.add(duration);
+    }
+}
+
 function getHeaders() {
     const headers = {
         'Content-Type': 'application/json',
@@ -45,7 +55,7 @@ export function setup() {
     console.log(`Running k6 local mixed test against: ${BASE_URL}`);
     console.log(`Testing health endpoint first...`);
 
-    const healthCheck = http.get(`${BASE_URL}/health`);
+    const healthCheck = http.get(`${BASE_URL}/health`, {tags: {name: 'setup/health'}});
     console.log(`Health check status: ${healthCheck.status}`);
 
     if (healthCheck.status !== 200) {
@@ -65,6 +75,7 @@ export function setup() {
             }),
             {
                 headers: {'Content-Type': 'application/json'},
+                tags: {name: 'setup/dev-token'},
             }
         );
 
@@ -97,9 +108,6 @@ export default function (data) {
         if (readType < 0.6) {
             // Get all feature flags with pagination
             const res = http.get(`${BASE_URL}/feature-flags?first=20`, {headers});
-            
-            featureFlagRequests.add(1);
-            featureFlagDuration.add(res.timings.duration);
 
             const success = check(res, {
                 'status is 200': (r) => r.status === 200,
@@ -113,7 +121,9 @@ export default function (data) {
             });
 
             if (!success) {
-                featureFlagErrors.add(1);
+                recordResult(res, false);
+            } else {
+                recordResult(res, true);
             }
         } else {
             // Evaluate a random flag (simulate common keys)
@@ -121,17 +131,12 @@ export default function (data) {
             const randomKey = flagKeys[Math.floor(Math.random() * flagKeys.length)];
             
             const res = http.get(`${BASE_URL}/evaluation/${randomKey}`, {headers});
-            
-            featureFlagRequests.add(1);
-            featureFlagDuration.add(res.timings.duration);
 
             const success = check(res, {
                 'evaluation completed': (r) => r.status === 200 || r.status === 404,
             });
 
-            if (!success) {
-                featureFlagErrors.add(1);
-            }
+            recordResult(res, success);
         }
     } else {
         // Write operations: Create, update, or delete
@@ -153,16 +158,11 @@ export default function (data) {
 
             const res = http.post(`${BASE_URL}/feature-flags`, payload, {headers});
 
-            featureFlagRequests.add(1);
-            featureFlagDuration.add(res.timings.duration);
-
             const success = check(res, {
                 'create status is 200 or 201': (r) => r.status === 200 || r.status === 201,
             });
 
-            if (!success) {
-                featureFlagErrors.add(1);
-            }
+            recordResult(res, success);
 
             // If successful, immediately update it
             if (res.status === 200 || res.status === 201) {
@@ -187,16 +187,11 @@ export default function (data) {
                     {headers: updateHeaders}
                 );
 
-                featureFlagRequests.add(1);
-                featureFlagDuration.add(updateRes.timings.duration);
-
                 const updateSuccess = check(updateRes, {
                     'update status is 200': (r) => r.status === 200,
                 });
 
-                if (!updateSuccess) {
-                    featureFlagErrors.add(1);
-                }
+                recordResult(updateRes, updateSuccess);
             }
         } else {
             // Create and immediately delete
@@ -209,16 +204,11 @@ export default function (data) {
 
             const createRes = http.post(`${BASE_URL}/feature-flags`, payload, {headers});
 
-            featureFlagRequests.add(1);
-            featureFlagDuration.add(createRes.timings.duration);
-
             const createSuccess = check(createRes, {
                 'create status is 200 or 201': (r) => r.status === 200 || r.status === 201,
             });
 
-            if (!createSuccess) {
-                featureFlagErrors.add(1);
-            }
+            recordResult(createRes, createSuccess);
 
             if (createRes.status === 200 || createRes.status === 201) {
                 const createdFlag = JSON.parse(createRes.body);
@@ -229,16 +219,11 @@ export default function (data) {
                     {headers}
                 );
 
-                featureFlagRequests.add(1);
-                featureFlagDuration.add(deleteRes.timings.duration);
-
                 const deleteSuccess = check(deleteRes, {
                     'delete status is 200 or 204': (r) => r.status === 200 || r.status === 204,
                 });
 
-                if (!deleteSuccess) {
-                    featureFlagErrors.add(1);
-                }
+                recordResult(deleteRes, deleteSuccess);
             }
         }
     }

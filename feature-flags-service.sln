@@ -20,6 +20,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		Dockerfile = Dockerfile
 		k6.local.mixed.js = k6.local.mixed.js
 		k6.local.read-heavy.js = k6.local.read-heavy.js
+		compose.local.test.yaml = compose.local.test.yaml
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedKernel", "SharedKernel\SharedKernel.csproj", "{2B3925C0-EAB3-40B6-B3C3-3EA42B512FF9}"
@@ -38,11 +39,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{955A5248-7
 	ProjectSection(SolutionItems) = preProject
 		ARCHITECTURE.md = ARCHITECTURE.md
 		PAGINATION.md = PAGINATION.md
-		DATABASE-MIGRATIONS.md = DATABASE-MIGRATIONS.md
 		ETAG.md = ETAG.md
 		INFRASTRUCTURE.md = INFRASTRUCTURE.md
 		K6-DOCKER.md = K6-DOCKER.md
-		K6-TEST-SCENARIOS.md = K6-TEST-SCENARIOS.md
 		MONITORING.md = MONITORING.md
 		QUICKSTART-MONITORING.md = QUICKSTART-MONITORING.md
 		README.md = README.md

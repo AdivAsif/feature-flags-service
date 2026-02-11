@@ -105,7 +105,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(http_requests_received_total{job=\"feature-flags-service\"}[1m])",
+          "expr": "rate(http_requests_received_total{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"}[1m])",
           "refId": "A",
           "legendFormat": "{{method}} {{code}}"
         }
@@ -167,7 +167,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(http_requests_received_total{job=\"feature-flags-service\"}[1m]))",
+          "expr": "sum(rate(http_requests_received_total{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"}[1m]))",
           "refId": "A"
         }
       ],
@@ -256,7 +256,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"feature-flags-service\"}[5m])) by (le, method, endpoint))",
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"}[5m])) by (le, method, endpoint))",
           "refId": "A",
           "legendFormat": "p95 {{method}} {{endpoint}}"
         },
@@ -265,7 +265,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"feature-flags-service\"}[5m])) by (le, method, endpoint))",
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"}[5m])) by (le, method, endpoint))",
           "refId": "B",
           "legendFormat": "p99 {{method}} {{endpoint}}"
         },
@@ -274,7 +274,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"feature-flags-service\"}[5m])) by (le, method, endpoint))",
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"}[5m])) by (le, method, endpoint))",
           "refId": "C",
           "legendFormat": "p50 {{method}} {{endpoint}}"
         }
@@ -331,7 +331,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (code) (rate(http_requests_received_total{job=\"feature-flags-service\"}[5m]))",
+          "expr": "sum by (code) (rate(http_requests_received_total{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"}[5m]))",
           "refId": "A",
           "legendFormat": "{{code}}"
         }
@@ -397,7 +397,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(http_requests_received_total{job=\"feature-flags-service\",code=~\"2..\"}[5m])) / sum(rate(http_requests_received_total{job=\"feature-flags-service\"}[5m]))",
+          "expr": "sum(rate(http_requests_received_total{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\",code=~\"2..|304\"}[5m])) / sum(rate(http_requests_received_total{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"}[5m]))",
           "refId": "A"
         }
       ],
@@ -462,7 +462,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(http_requests_received_total{job=\"feature-flags-service\",code=~\"4..|5..\"}[5m])) / sum(rate(http_requests_received_total{job=\"feature-flags-service\"}[5m]))",
+          "expr": "sum(rate(http_requests_received_total{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\",code=~\"4..|5..\"}[5m])) / sum(rate(http_requests_received_total{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"}[5m]))",
           "refId": "A"
         }
       ],
@@ -521,7 +521,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(http_requests_in_progress{job=\"feature-flags-service\"})",
+          "expr": "sum(http_requests_in_progress{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"})",
           "refId": "A"
         }
       ],
@@ -580,7 +580,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(http_requests_received_total{job=\"feature-flags-service\"}[1h]))",
+          "expr": "sum(increase(http_requests_received_total{job=\"feature-flags-service\",endpoint!~\"/health|/dev/token\"}[1h]))",
           "refId": "A"
         }
       ],

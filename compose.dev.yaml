@@ -19,14 +19,14 @@ services:
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:8080/health || exit 1" ]
       interval: 5s
-      timeout: 3s
-      retries: 5
-      start_period: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
     profiles:
       - with-api
@@ -38,6 +38,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: feature_flags_db
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
     networks:
@@ -151,7 +153,7 @@ services:
     networks:
       - feature-flags-network
     volumes:
-      - "./k6.local.mixed.js:/scripts/k6.local.read-heavy.js"
+      - "./k6.local.mixed.js:/scripts/k6-load-test.js"
       - "k6_results:/results"
     environment:
       - K6_OUT=json=/results/k6-results.json
@@ -162,7 +164,7 @@ services:
         condition: service_healthy
     profiles:
       - load-test
-    entrypoint: [ "/bin/sh", "-c", "exec k6 run --out json=/results/k6-results.json /scripts/k6.local.read-heavy.js" ]
+    entrypoint: [ "/bin/sh", "-c", "exec k6 run --out json=/results/k6-results.json /scripts/k6-load-test.js" ]
 
 networks:
   feature-flags-network:
