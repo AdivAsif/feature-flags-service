@@ -7,11 +7,19 @@ public class ETagMiddleware(RequestDelegate next)
 {
     private const long MaxBodyBytesToHash = 64 * 1024;
     private static readonly PathString EvaluationPathPrefix = new("/api/evaluation");
+    private static readonly PathString EvaluationV1PathPrefix = new("/api/v1/evaluation");
 
     public async Task InvokeAsync(HttpContext context)
     {
         // Avoid buffering/hashing for the hot-path evaluation endpoint.
         // Evaluation responses are user-context dependent and typically not a good candidate for client-side ETags.
+        if (context.Request.Path.StartsWithSegments(EvaluationPathPrefix) || 
+            context.Request.Path.StartsWithSegments(EvaluationV1PathPrefix))
+        {
+            await next(context);
+            return;
+        }
+
         var endpoint = context.GetEndpoint();
         if (endpoint?.Metadata.GetMetadata<DisableETagMetadata>() != null)
         {

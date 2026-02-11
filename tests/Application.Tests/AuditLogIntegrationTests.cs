@@ -1,8 +1,10 @@
 using System.Diagnostics;
-using Application.DTOs;
 using Application.Interfaces;
 using Application.Interfaces.Repositories;
+using Application.Mappers;
 using Application.Services;
+using Contracts.Requests;
+using Contracts.Responses;
 using Domain;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,13 +27,7 @@ public class AuditLogIntegrationTests
         var queue = new AuditLogQueue(queueLogger);
         var featureFlagsService = new FeatureFlagsService(repository, mapper, queue);
 
-        var dto = new FeatureFlagDto
-        {
-            Key = "test-feature",
-            Description = "Test feature",
-            Enabled = true,
-            Parameters = Array.Empty<FeatureFlagParameters>()
-        };
+        var dto = new CreateFeatureFlagRequest("test-feature", "Test feature", true, []);
 
         repository.GetByKeyAsync(_testProjectId, dto.Key).Returns((FeatureFlag?)null);
         repository.CreateAsync(Arg.Any<FeatureFlag>()).Returns(call =>
@@ -73,7 +69,7 @@ public class AuditLogIntegrationTests
         var queue = new AuditLogQueue(queueLogger);
         var featureFlagsService = new FeatureFlagsService(repository, mapper, queue);
 
-        var key = "test-feature";
+        const string key = "test-feature";
         var existingFlag = new FeatureFlag
         {
             Id = Guid.NewGuid(),
@@ -85,13 +81,7 @@ public class AuditLogIntegrationTests
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        var dto = new FeatureFlagDto
-        {
-            Key = key,
-            Description = "Updated description",
-            Enabled = true,
-            Parameters = Array.Empty<FeatureFlagParameters>()
-        };
+        var dto = new UpdateFeatureFlagRequest("Updated description", true, Array.Empty<FeatureFlagParameters>());
 
         repository.GetByKeyAsync(_testProjectId, key).Returns(existingFlag);
         repository.UpdateAsync(Arg.Any<FeatureFlag>()).Returns(call => call.Arg<FeatureFlag>());
@@ -127,7 +117,7 @@ public class AuditLogIntegrationTests
         var queue = new AuditLogQueue(queueLogger);
         var featureFlagsService = new FeatureFlagsService(repository, mapper, queue);
 
-        var key = "test-feature";
+        const string key = "test-feature";
         var id = Guid.NewGuid();
         var featureFlag = new FeatureFlag
         {
@@ -181,8 +171,8 @@ public class AuditLogIntegrationTests
         var backgroundLogger = Substitute.For<ILogger<AuditLogBackgroundService>>();
         var backgroundService = new AuditLogBackgroundService(queue, serviceProvider, backgroundLogger);
 
-        auditLogsService.AppendAsync(Arg.Any<AuditLogDto>())
-            .Returns(x => Task.FromResult(x.Arg<AuditLogDto>()));
+        auditLogsService.AppendAsync(Arg.Any<AuditLogResponse>(), Arg.Any<CancellationToken>())
+            .Returns(x => Task.FromResult(x.Arg<AuditLogResponse>()));
 
         // Configure repository mocks
         repository.GetByKeyAsync(Arg.Any<Guid>(), Arg.Any<string>()).Returns((FeatureFlag?)null);
@@ -196,10 +186,8 @@ public class AuditLogIntegrationTests
         });
 
         // Act - Perform multiple feature flag operations
-        var dto1 = new FeatureFlagDto
-            { Key = "feature1", Enabled = true, Parameters = Array.Empty<FeatureFlagParameters>() };
-        var dto2 = new FeatureFlagDto
-            { Key = "feature2", Enabled = false, Parameters = Array.Empty<FeatureFlagParameters>() };
+        var dto1 = new CreateFeatureFlagRequest("feature1", string.Empty, true, []);
+        var dto2 = new CreateFeatureFlagRequest("feature2", string.Empty, false, []);
 
         await featureFlagsService.CreateAsync(_testProjectId, dto1, "user1", "user1@example.com");
         await featureFlagsService.CreateAsync(_testProjectId, dto2, "user2", "user2@example.com");
@@ -209,17 +197,17 @@ public class AuditLogIntegrationTests
         var executeTask = backgroundService.StartAsync(cts.Token);
 
         // Wait for processing
-        await Task.Delay(200);
+        await Task.Delay(200, cts.Token);
 
         // Stop the service
-        cts.Cancel();
+        await cts.CancelAsync();
         await backgroundService.StopAsync(CancellationToken.None);
 
         // Assert - Both audit logs should have been processed
-        await auditLogsService.Received(2).AppendAsync(Arg.Any<AuditLogDto>(), Arg.Any<CancellationToken>());
-        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogDto>(a => a.PerformedByUserId == "user1"),
+        await auditLogsService.Received(2).AppendAsync(Arg.Any<AuditLogResponse>(), Arg.Any<CancellationToken>());
+        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogResponse>(a => a.PerformedByUserId == "user1"),
             Arg.Any<CancellationToken>());
-        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogDto>(a => a.PerformedByUserId == "user2"),
+        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogResponse>(a => a.PerformedByUserId == "user2"),
             Arg.Any<CancellationToken>());
     }
 }

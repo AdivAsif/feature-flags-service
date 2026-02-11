@@ -3,26 +3,21 @@ using Microsoft.Extensions.Logging;
 
 namespace FeatureFlags.Client.DependencyInjection.Resilience;
 
-internal sealed class FeatureFlagsRetryHandler : DelegatingHandler
+internal sealed class FeatureFlagsRetryHandler(
+    FeatureFlagsClientOptions options,
+    ILogger<FeatureFlagsRetryHandler>? logger = null)
+    : DelegatingHandler
 {
-    private readonly ILogger<FeatureFlagsRetryHandler>? _logger;
-    private readonly FeatureFlagsClientOptions _options;
     private readonly Random _random = new();
-
-    public FeatureFlagsRetryHandler(FeatureFlagsClientOptions options, ILogger<FeatureFlagsRetryHandler>? logger = null)
-    {
-        _options = options;
-        _logger = logger;
-    }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
-        if (!_options.EnableRetries || _options.MaxRetries <= 0 ||
-            (_options.RetryOnlyIdempotentRequests && !IsIdempotent(request.Method)))
+        if (!options.EnableRetries || options.MaxRetries <= 0 ||
+            (options.RetryOnlyIdempotentRequests && !IsIdempotent(request.Method)))
             return await base.SendAsync(request, cancellationToken);
 
-        for (var attempt = 0; attempt <= _options.MaxRetries; attempt++)
+        for (var attempt = 0; attempt <= options.MaxRetries; attempt++)
         {
             HttpResponseMessage? response = null;
             Exception? exception = null;
@@ -38,15 +33,15 @@ internal sealed class FeatureFlagsRetryHandler : DelegatingHandler
                 exception = ex;
             }
 
-            if (attempt == _options.MaxRetries) return exception is not null ? throw exception : response!;
+            if (attempt == options.MaxRetries) return exception is not null ? throw exception : response!;
 
             response?.Dispose();
 
             var delay = ComputeDelay(attempt);
-            _logger?.LogWarning(
+            logger?.LogWarning(
                 "Retrying feature flags HTTP request (attempt {Attempt}/{MaxRetries}) after {DelayMs}ms",
                 attempt + 1,
-                _options.MaxRetries,
+                options.MaxRetries,
                 (int)delay.TotalMilliseconds);
 
             await Task.Delay(delay, cancellationToken);
@@ -55,7 +50,7 @@ internal sealed class FeatureFlagsRetryHandler : DelegatingHandler
         return await base.SendAsync(request, cancellationToken);
     }
 
-    private bool IsRetryable(Exception ex, CancellationToken cancellationToken)
+    private static bool IsRetryable(Exception ex, CancellationToken cancellationToken)
     {
         if (cancellationToken.IsCancellationRequested)
             return false;
@@ -78,13 +73,13 @@ internal sealed class FeatureFlagsRetryHandler : DelegatingHandler
         if (statusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests)
             return true;
 
-        return code >= 500 && code <= 599;
+        return code is >= 500 and <= 599;
     }
 
     private TimeSpan ComputeDelay(int attempt)
     {
-        var baseMs = _options.RetryBaseDelay.TotalMilliseconds;
-        var maxMs = _options.RetryMaxDelay.TotalMilliseconds;
+        var baseMs = options.RetryBaseDelay.TotalMilliseconds;
+        var maxMs = options.RetryMaxDelay.TotalMilliseconds;
 
         var exponential = baseMs * Math.Pow(2, attempt);
         var clamped = Math.Min(exponential, maxMs);

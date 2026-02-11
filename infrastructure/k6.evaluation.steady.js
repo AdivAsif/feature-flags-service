@@ -43,10 +43,10 @@ const API_BASE_PATH_OVERRIDE = (__ENV.API_BASE_PATH || '').trim();
 const API_KEY_OVERRIDE = (__ENV.API_KEY || '').trim();
 const FLAG_KEYS_RAW = (__ENV.FLAG_KEYS || '').trim();
 
-const RATE = Number(__ENV.RATE || 20000);
+const RATE = Number(__ENV.RATE || 50000);
 const DURATION = __ENV.DURATION || '2m';
-const PRE_ALLOCATED_VUS = Number(__ENV.PRE_ALLOCATED_VUS || 50);
-const MAX_VUS = Number(__ENV.MAX_VUS || 75);
+const PRE_ALLOCATED_VUS = Number(__ENV.PRE_ALLOCATED_VUS || 75);
+const MAX_VUS = Number(__ENV.MAX_VUS || 150);
 
 const USER_COUNT = Number(__ENV.USER_COUNT || 100);
 const GROUPS_RAW = (__ENV.GROUPS || 'premium,beta-testers,early-adopters').trim();

@@ -232,11 +232,11 @@ public class FeatureFlagsRepositoryTests : IDisposable
 
         // Assert
         result.Items.Should().HaveCount(2);
-        result.PageInfo.HasNextPage.Should().BeTrue();
-        result.PageInfo.HasPreviousPage.Should().BeFalse();
-        result.PageInfo.TotalCount.Should().Be(3);
-        result.PageInfo.StartCursor.Should().NotBeNullOrEmpty();
-        result.PageInfo.EndCursor.Should().NotBeNullOrEmpty();
+        result.HasNextPage.Should().BeTrue();
+        result.HasPreviousPage.Should().BeFalse();
+        result.TotalCount.Should().Be(3);
+        result.StartCursor.Should().NotBeNullOrEmpty();
+        result.EndCursor.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
@@ -269,7 +269,7 @@ public class FeatureFlagsRepositoryTests : IDisposable
         var firstPage = await _repository.GetPagedAsync(projectId, 1);
 
         // Act
-        var result = await _repository.GetPagedAsync(projectId, 2, firstPage.PageInfo.EndCursor);
+        var result = await _repository.GetPagedAsync(projectId, 2, firstPage.EndCursor);
 
         // Assert
         result.Items.Should().HaveCount(2);

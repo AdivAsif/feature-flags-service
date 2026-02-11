@@ -1,4 +1,4 @@
-﻿using Application.Exceptions;
+using Application.Exceptions;
 using Application.Interfaces;
 
 namespace Web.Api.Endpoints.AuditLogs;

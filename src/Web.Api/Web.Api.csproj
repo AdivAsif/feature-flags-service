@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
@@ -7,12 +7,14 @@
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
         <Configurations>Debug;Release;Production</Configurations>
         <Platforms>AnyCPU</Platforms>
+        <UserSecretsId>4a5a30b2-8089-43d4-8741-f1b5fce07cdf</UserSecretsId>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Asp.Versioning.Http" Version="8.1.0"/>
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.2"/>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2"/>
+        <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.2"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.2"/>
         <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.2"/>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.2"/>

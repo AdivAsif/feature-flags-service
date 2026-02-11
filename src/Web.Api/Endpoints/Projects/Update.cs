@@ -1,6 +1,6 @@
-using Application.DTOs;
 using Application.Exceptions;
 using Application.Interfaces;
+using Contracts.Requests;
 
 namespace Web.Api.Endpoints.Projects;
 
@@ -9,14 +9,14 @@ public class Update : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPut("/projects/{id:guid}",
-            async (Guid id, UpdateProjectDto updateProjectDto, IProjectService projectService,
+            async (Guid id, UpdateProjectRequest UpdateProjectRequest, IProjectService projectService,
                 ILogger<Update> logger) =>
             {
                 try
                 {
                     logger.LogDebug("Updating project with id: {Id}", id);
 
-                    var updatedProject = await projectService.UpdateAsync(id, updateProjectDto);
+                    var updatedProject = await projectService.UpdateAsync(id, UpdateProjectRequest);
 
                     return Results.Ok(updatedProject);
                 }

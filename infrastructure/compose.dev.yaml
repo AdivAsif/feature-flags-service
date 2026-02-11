@@ -9,7 +9,7 @@ services:
       - ASPNETCORE_URLS=http://+:8080
       - ConnectionStrings__FeatureFlagsDatabase=Host=postgres;Database=feature_flags_db;Username=postgres;Password=password
       - ConnectionStrings__FeatureFlagsCache=redis:6379
-      - JwtSecretKey=adivadivadivadivadivadivadivadiv
+      - JwtSecretKey=${JWT_SECRET_KEY:-adivadivadivadivadivadivadivadiv}
       - JwtIssuer=http://localhost:8080
       - JwtAudience=feature_flags_api
     ports:
@@ -36,7 +36,7 @@ services:
     container_name: feature_flags_db_chaos
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
       POSTGRES_DB: feature_flags_db
       POSTGRES_INITDB_ARGS: "--data-checksums"
       POSTGRES_HOST_AUTH_METHOD: trust
@@ -137,7 +137,7 @@ services:
     restart: unless-stopped
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_RENDERING_SERVER_URL=http://renderer:8081/render
       - GF_RENDERING_CALLBACK_URL=http://grafana:3000/

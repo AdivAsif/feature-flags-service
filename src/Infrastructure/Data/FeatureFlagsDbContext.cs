@@ -1,7 +1,8 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Infrastructure.Data;
@@ -33,9 +34,21 @@ public class FeatureFlagsDbContext(DbContextOptions<FeatureFlagsDbContext> optio
             entity.Property(e => e.Enabled).IsRequired();
             entity.Property(e => e.Version).IsRequired();
             entity.Property(e => e.Parameters).HasConversion(p =>
-                    JsonSerializer.Serialize(p, JsonOptions),
-                p => JsonSerializer.Deserialize<FeatureFlagParameters[]>(p, JsonOptions) ??
-                     Array.Empty<FeatureFlagParameters>());
+                        JsonSerializer.Serialize(p, JsonOptions),
+                    p => JsonSerializer.Deserialize<FeatureFlagParameters[]>(p, JsonOptions) ??
+                         Array.Empty<FeatureFlagParameters>())
+                .Metadata.SetValueComparer(
+                    new ValueComparer<FeatureFlagParameters[]>(
+                        (a, b) =>
+                            (a == null && b == null) ||
+                            (a != null && b != null && ((IEnumerable<FeatureFlagParameters>)a).SequenceEqual(b)),
+                        v =>
+                            v.Aggregate(0,
+                                (hash, item) =>
+                                    HashCode.Combine(hash, item.RuleType, item.RuleValue)),
+                        v => v.ToArray()
+                    )
+                );
             entity.HasIndex(e => e.ProjectId);
             entity.HasIndex(e => new { e.ProjectId, e.Key }).IsUnique();
             entity.HasIndex(e => new { e.ProjectId, e.Key })

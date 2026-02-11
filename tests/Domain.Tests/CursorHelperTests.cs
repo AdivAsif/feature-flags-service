@@ -1,6 +1,5 @@
 using System.Text;
-using FluentAssertions;
-using SharedKernel;
+using Infrastructure;
 
 namespace Domain.Tests;
 

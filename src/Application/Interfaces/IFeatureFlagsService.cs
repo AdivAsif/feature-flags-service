@@ -1,20 +1,22 @@
-﻿using Application.DTOs;
+using Application.Common;
+using Contracts.Requests;
+using Contracts.Responses;
 
 namespace Application.Interfaces;
 
 public interface IFeatureFlagsService
 {
-    Task<FeatureFlagDto?> GetAsync(Guid projectId, Guid id, CancellationToken cancellationToken = default);
-    Task<FeatureFlagDto?> GetByKeyAsync(Guid projectId, string key, CancellationToken cancellationToken = default);
+    Task<FeatureFlagResponse?> GetAsync(Guid projectId, Guid id, CancellationToken cancellationToken = default);
+    Task<FeatureFlagResponse?> GetByKeyAsync(Guid projectId, string key, CancellationToken cancellationToken = default);
 
-    Task<PagedDto<FeatureFlagDto>> GetPagedAsync(Guid projectId, int first = 10, string? after = null,
+    Task<Slice<FeatureFlagResponse>> GetPagedAsync(Guid projectId, int first = 10, string? after = null,
         string? before = null, CancellationToken cancellationToken = default);
 
-    Task<FeatureFlagDto> CreateAsync(Guid projectId, FeatureFlagDto featureFlag,
+    Task<FeatureFlagResponse> CreateAsync(Guid projectId, CreateFeatureFlagRequest featureFlag,
         string? performedByUserId = null,
         string? performedByUserEmail = null, CancellationToken cancellationToken = default);
 
-    Task<FeatureFlagDto> UpdateAsync(Guid projectId, string key, FeatureFlagDto featureFlag,
+    Task<FeatureFlagResponse> UpdateAsync(Guid projectId, string key, UpdateFeatureFlagRequest featureFlag,
         string? performedByUserId = null,
         string? performedByUserEmail = null, CancellationToken cancellationToken = default);
 

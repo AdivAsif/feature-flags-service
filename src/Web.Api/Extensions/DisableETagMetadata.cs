@@ -1,3 +1,3 @@
-﻿namespace Web.Api.Extensions;
+namespace Web.Api.Extensions;
 
 public sealed class DisableETagMetadata;

@@ -13,7 +13,8 @@ namespace Infrastructure.Repositories;
 ///     - Distributed: 24 hours
 ///     - Background operations enabled for write-through caching
 /// </summary>
-public class CachedApiKeyRepository : IApiKeyRepository
+public class CachedApiKeyRepository(IApiKeyRepository innerRepository, IFusionCache cache, ApiKeyUsageQueue usageQueue)
+    : IApiKeyRepository
 {
     private static readonly FusionCacheEntryOptions CacheOptions = new()
     {
@@ -25,24 +26,13 @@ public class CachedApiKeyRepository : IApiKeyRepository
         Size = 1
     };
 
-    private readonly IFusionCache _cache;
-    private readonly IApiKeyRepository _innerRepository;
-    private readonly ApiKeyUsageQueue _usageQueue;
-
-    public CachedApiKeyRepository(IApiKeyRepository innerRepository, IFusionCache cache, ApiKeyUsageQueue usageQueue)
-    {
-        _innerRepository = innerRepository;
-        _cache = cache;
-        _usageQueue = usageQueue;
-    }
-
     public async Task<ApiKey?> GetByIdAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
     {
         var cacheKey = CacheKeys.ApiKeyById(apiKeyId);
 
-        return await _cache.GetOrSetAsync(
+        return await cache.GetOrSetAsync(
             cacheKey,
-            async _ => await _innerRepository.GetByIdAsync(apiKeyId, cancellationToken),
+            async _ => await innerRepository.GetByIdAsync(apiKeyId, cancellationToken),
             CacheOptions,
             cancellationToken);
     }
@@ -55,9 +45,9 @@ public class CachedApiKeyRepository : IApiKeyRepository
     {
         var cacheKey = CacheKeys.ApiKey(keyHash);
 
-        return await _cache.GetOrSetAsync(
+        return await cache.GetOrSetAsync(
             cacheKey,
-            async _ => await _innerRepository.GetByKeyHashAsync(keyHash, cancellationToken),
+            async _ => await innerRepository.GetByKeyHashAsync(keyHash, cancellationToken),
             CacheOptions,
             cancellationToken);
     }
@@ -67,9 +57,9 @@ public class CachedApiKeyRepository : IApiKeyRepository
     {
         var cacheKey = CacheKeys.ApiKeysByProject(projectId);
 
-        return await _cache.GetOrSetAsync(
+        return await cache.GetOrSetAsync(
             cacheKey,
-            async _ => await _innerRepository.GetByProjectIdAsync(projectId, cancellationToken),
+            async _ => await innerRepository.GetByProjectIdAsync(projectId, cancellationToken),
             new FusionCacheEntryOptions
             {
                 Duration = TimeSpan.FromMinutes(30),
@@ -82,13 +72,13 @@ public class CachedApiKeyRepository : IApiKeyRepository
 
     public async Task<ApiKey> CreateAsync(ApiKey apiKey, CancellationToken cancellationToken = default)
     {
-        var createdKey = await _innerRepository.CreateAsync(apiKey, cancellationToken);
+        var createdKey = await innerRepository.CreateAsync(apiKey, cancellationToken);
 
         _ = Task.Run(async () =>
         {
-            await _cache.SetAsync(CacheKeys.ApiKey(createdKey.KeyHash), createdKey, CacheOptions, cancellationToken);
-            await _cache.SetAsync(CacheKeys.ApiKeyById(createdKey.Id), createdKey, CacheOptions, cancellationToken);
-            await _cache.RemoveAsync(CacheKeys.ApiKeysByProject(createdKey.ProjectId), token: cancellationToken);
+            await cache.SetAsync(CacheKeys.ApiKey(createdKey.KeyHash), createdKey, CacheOptions, cancellationToken);
+            await cache.SetAsync(CacheKeys.ApiKeyById(createdKey.Id), createdKey, CacheOptions, cancellationToken);
+            await cache.RemoveAsync(CacheKeys.ApiKeysByProject(createdKey.ProjectId), token: cancellationToken);
         }, cancellationToken);
 
         return createdKey;
@@ -96,21 +86,28 @@ public class CachedApiKeyRepository : IApiKeyRepository
 
     public async Task RevokeAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
     {
-        var apiKey = await _innerRepository.GetByIdAsync(apiKeyId, cancellationToken);
-        await _innerRepository.RevokeAsync(apiKeyId, cancellationToken);
+        var apiKey = await innerRepository.GetByIdAsync(apiKeyId, cancellationToken);
+        await innerRepository.RevokeAsync(apiKeyId, cancellationToken);
 
         if (apiKey != null)
         {
-            await _cache.RemoveAsync(CacheKeys.ApiKey(apiKey.KeyHash), token: cancellationToken);
-            await _cache.RemoveAsync(CacheKeys.ApiKeyById(apiKey.Id), token: cancellationToken);
-            await _cache.RemoveAsync(CacheKeys.ApiKeysByProject(apiKey.ProjectId), token: cancellationToken);
+            await cache.RemoveAsync(CacheKeys.ApiKey(apiKey.KeyHash), token: cancellationToken);
+            await cache.RemoveAsync(CacheKeys.ApiKeyById(apiKey.Id), token: cancellationToken);
+            await cache.RemoveAsync(CacheKeys.ApiKeysByProject(apiKey.ProjectId), token: cancellationToken);
         }
     }
-
-    public async Task UpdateLastUsedAtAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
+    
+    public Task UpdateLastUsedAtAsync(Guid apiKeyId, CancellationToken _ = default)
     {
-        // Queue for background processing instead of blocking the request
-        // The background service will throttle updates to once per hour per key
-        _ = _usageQueue.QueueApiKeyUsageAsync(apiKeyId, cancellationToken);
+        usageQueue.TryQueue(apiKeyId);
+        return Task.CompletedTask;
     }
+
+    // public Task UpdateLastUsedAtAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
+    // {
+    //     // Queue for background processing instead of blocking the request
+    //     // The background service will throttle updates to once per hour per key
+    //     _ = usageQueue.QueueApiKeyUsageAsync(apiKeyId, cancellationToken);
+    //     return Task.CompletedTask;
+    // }
 }

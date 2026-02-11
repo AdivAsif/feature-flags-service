@@ -1,5 +1,3 @@
-using FluentAssertions;
-
 namespace Domain.Tests;
 
 public class FeatureFlagTests

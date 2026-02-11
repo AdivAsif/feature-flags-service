@@ -1,6 +1,6 @@
-using Application.DTOs;
 using Application.Interfaces;
 using Application.Services;
+using Contracts.Responses;
 using Domain;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,17 +31,17 @@ public class AuditLogBackgroundServiceTests
 
         var backgroundService = new AuditLogBackgroundService(queue, serviceProvider, logger);
 
-        var auditLog = new AuditLogDto
+        var auditLog = new AuditLogResponse
         {
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Create,
             NewStateJson = "{\"enabled\":true}",
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
             PerformedByUserId = "user123",
             PerformedByUserEmail = "user@example.com"
         };
 
-        auditLogsService.AppendAsync(Arg.Any<AuditLogDto>(), Arg.Any<CancellationToken>())
+        auditLogsService.AppendAsync(Arg.Any<AuditLogResponse>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(auditLog));
 
         // Act
@@ -51,14 +51,14 @@ public class AuditLogBackgroundServiceTests
         var executeTask = backgroundService.StartAsync(cts.Token);
 
         // Give it a moment to process
-        await Task.Delay(100);
+        await Task.Delay(100, cts.Token);
 
         // Stop the service
-        cts.Cancel();
+        await cts.CancelAsync();
         await backgroundService.StopAsync(CancellationToken.None);
 
         // Assert
-        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogDto>(a =>
+        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogResponse>(a =>
             a.FeatureFlagId == auditLog.FeatureFlagId &&
             a.Action == AuditLogAction.Create), Arg.Any<CancellationToken>());
     }
@@ -83,38 +83,38 @@ public class AuditLogBackgroundServiceTests
 
         var backgroundService = new AuditLogBackgroundService(queue, serviceProvider, logger);
 
-        var auditLog = new AuditLogDto
+        var auditLog = new AuditLogResponse
         {
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Create,
             NewStateJson = "{\"enabled\":true}",
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
             PerformedByUserId = "user123",
             PerformedByUserEmail = "user@example.com"
         };
 
         // Make the service throw an exception
-        auditLogsService.AppendAsync(Arg.Any<AuditLogDto>(), Arg.Any<CancellationToken>())
-            .Returns<AuditLogDto>(_ => throw new Exception("Test exception"));
+        auditLogsService.AppendAsync(Arg.Any<AuditLogResponse>(), Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromException<AuditLogResponse>(new Exception("Test exception")));
 
         // Act
         await queue.QueueAuditLogAsync(auditLog);
 
         var cts = new CancellationTokenSource();
-        var executeTask = backgroundService.StartAsync(cts.Token);
+        await backgroundService.StartAsync(cts.Token);
 
         // Give it a moment to process
-        await Task.Delay(100);
+        await Task.Delay(100, cts.Token);
 
         // Stop the service
-        cts.Cancel();
+        await cts.CancelAsync();
 
         // Act - should not throw
         var act = async () => await backgroundService.StopAsync(CancellationToken.None);
 
         // Assert - should handle exception gracefully
         await act.Should().NotThrowAsync();
-        await auditLogsService.Received(1).AppendAsync(Arg.Any<AuditLogDto>(), Arg.Any<CancellationToken>());
+        await auditLogsService.Received(1).AppendAsync(Arg.Any<AuditLogResponse>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -137,45 +137,45 @@ public class AuditLogBackgroundServiceTests
 
         var backgroundService = new AuditLogBackgroundService(queue, serviceProvider, logger);
 
-        var auditLog1 = new AuditLogDto
+        var auditLog1 = new AuditLogResponse
         {
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Create,
             NewStateJson = "{\"enabled\":true}",
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
             PerformedByUserId = "user1",
             PerformedByUserEmail = "user1@example.com"
         };
 
-        var auditLog2 = new AuditLogDto
+        var auditLog2 = new AuditLogResponse
         {
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Update,
             PreviousStateJson = "{\"enabled\":true}",
             NewStateJson = "{\"enabled\":false}",
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
             PerformedByUserId = "user2",
             PerformedByUserEmail = "user2@example.com"
         };
 
-        auditLogsService.AppendAsync(Arg.Any<AuditLogDto>(), Arg.Any<CancellationToken>())
-            .Returns(x => Task.FromResult(x.Arg<AuditLogDto>()));
+        auditLogsService.AppendAsync(Arg.Any<AuditLogResponse>(), Arg.Any<CancellationToken>())
+            .Returns(x => Task.FromResult(x.Arg<AuditLogResponse>()));
 
         // Act
         await queue.QueueAuditLogAsync(auditLog1);
         await queue.QueueAuditLogAsync(auditLog2);
 
         var cts = new CancellationTokenSource();
-        var executeTask = backgroundService.StartAsync(cts.Token);
+        await backgroundService.StartAsync(cts.Token);
 
         // Give it time to process both
-        await Task.Delay(200);
+        await Task.Delay(200, cts.Token);
 
         // Stop the service
-        cts.Cancel();
+        await cts.CancelAsync();
         await backgroundService.StopAsync(CancellationToken.None);
 
         // Assert
-        await auditLogsService.Received(2).AppendAsync(Arg.Any<AuditLogDto>(), Arg.Any<CancellationToken>());
+        await auditLogsService.Received(2).AppendAsync(Arg.Any<AuditLogResponse>(), Arg.Any<CancellationToken>());
     }
 }

@@ -116,7 +116,7 @@ public class DbSeeder(IDbContextFactory<FeatureFlagsDbContext> factory, IConfigu
                     Description = "Display welcome banner for new users",
                     Enabled = true,
                     Version = 1,
-                    Parameters = Array.Empty<FeatureFlagParameters>(),
+                    Parameters = [new FeatureFlagParameters { RuleType = 0, RuleValue = "50" }],
                     CreatedAt = DateTimeOffset.UtcNow,
                     UpdatedAt = DateTimeOffset.UtcNow
                 },
@@ -128,7 +128,7 @@ public class DbSeeder(IDbContextFactory<FeatureFlagsDbContext> factory, IConfigu
                     Description = "Enable dark mode UI theme",
                     Enabled = false,
                     Version = 1,
-                    Parameters = Array.Empty<FeatureFlagParameters>(),
+                    Parameters = [new FeatureFlagParameters { RuleType = RuleType.Group, RuleValue = "beta" }],
                     CreatedAt = DateTimeOffset.UtcNow,
                     UpdatedAt = DateTimeOffset.UtcNow
                 },
@@ -140,7 +140,7 @@ public class DbSeeder(IDbContextFactory<FeatureFlagsDbContext> factory, IConfigu
                     Description = "Enable access to beta features",
                     Enabled = false,
                     Version = 1,
-                    Parameters = Array.Empty<FeatureFlagParameters>(),
+                    Parameters = [new FeatureFlagParameters { RuleType = RuleType.User, RuleValue = "user1" }],
                     CreatedAt = DateTimeOffset.UtcNow,
                     UpdatedAt = DateTimeOffset.UtcNow
                 }

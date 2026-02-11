@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using Application.Interfaces;
 using Web.Api.Extensions;
 
@@ -27,9 +27,9 @@ public class GetAll : IEndpoint
                     "Getting feature flags for project {ProjectId} with cursor pagination (first: {First}, after: {After}, before: {Before})",
                     projectId, first, after ?? "null", before ?? "null");
 
-                var pagedResult = await featureFlagsService.GetPagedAsync(projectId.Value, first, after, before);
+                var slice = await featureFlagsService.GetPagedAsync(projectId.Value, first, after, before);
 
-                return Results.Ok(pagedResult);
+                return Results.Ok(slice.ToPagedResult());
             })
             .WithName("GetAllFeatureFlags")
             .RequireAuthorization("ReadAccess");

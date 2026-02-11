@@ -1,5 +1,6 @@
 using System.Net;
-using FeatureFlags.Client.Exceptions;
+using Contracts.Common;
+using Contracts.Models;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
@@ -21,10 +22,9 @@ public sealed class StubServerIntegrationTests
             if (!request.Headers.TryGetValue("Authorization", out var auth) || auth != "Bearer ffsk_123")
                 return Results.Unauthorized();
 
-            if (featureFlagKey == "always-on")
-                return Results.Ok(new { allowed = true, reason = "stubbed" });
-
-            return Results.NotFound();
+            return featureFlagKey == "always-on"
+                ? Results.Ok(new { allowed = true, reason = "stubbed" })
+                : Results.NotFound();
         });
 
         await app.StartAsync();

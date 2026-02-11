@@ -1,26 +1,28 @@
-using Application.DTOs;
 using Application.Exceptions;
 using Application.Interfaces;
 using Application.Interfaces.Repositories;
+using Contracts.Requests;
+using Contracts.Responses;
 using Domain;
 
 namespace Infrastructure.Services;
 
 public sealed class ProjectService(IProjectRepository projectRepository) : IProjectService
 {
-    public async Task<ProjectDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<ProjectResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var project = await projectRepository.GetByIdAsync(id, cancellationToken);
         return project == null ? throw new NotFoundException($"Project with id: {id} not found") : Map(project);
     }
 
-    public async Task<IEnumerable<ProjectDto>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<ProjectResponse>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var projects = await projectRepository.GetAllAsync(cancellationToken);
         return projects.Select(Map);
     }
 
-    public async Task<CreateProjectResult> CreateAsync(CreateProjectDto dto, string? performedByUserId = null,
+    public async Task<(ProjectResponse Project, bool Created)> CreateAsync(CreateProjectRequest dto,
+        string? performedByUserId = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(dto.Name))
@@ -29,7 +31,7 @@ public sealed class ProjectService(IProjectRepository projectRepository) : IProj
         var trimmedName = dto.Name.Trim();
         var existing = await projectRepository.GetByNameAsync(trimmedName, cancellationToken);
         if (existing != null)
-            return new CreateProjectResult(Map(existing), false);
+            return (Map(existing), false);
 
         var project = new Project
         {
@@ -41,10 +43,10 @@ public sealed class ProjectService(IProjectRepository projectRepository) : IProj
 
         var created = await projectRepository.CreateAsync(project, cancellationToken);
 
-        return new CreateProjectResult(Map(created), true);
+        return (Map(created), true);
     }
 
-    public async Task<ProjectDto> UpdateAsync(Guid id, UpdateProjectDto dto,
+    public async Task<ProjectResponse> UpdateAsync(Guid id, UpdateProjectRequest dto,
         CancellationToken cancellationToken = default)
     {
         var project = await projectRepository.GetByIdAsync(id, cancellationToken);
@@ -73,9 +75,9 @@ public sealed class ProjectService(IProjectRepository projectRepository) : IProj
         await projectRepository.DeleteAsync(id, cancellationToken);
     }
 
-    private static ProjectDto Map(Project project)
+    private static ProjectResponse Map(Project project)
     {
-        return new ProjectDto
+        return new ProjectResponse
         {
             Id = project.Id,
             Name = project.Name,

@@ -1,6 +1,4 @@
 using System.Reflection;
-using System.Security.Claims;
-using Domain;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Web.Api.Endpoints;
 

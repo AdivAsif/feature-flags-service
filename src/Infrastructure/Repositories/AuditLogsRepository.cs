@@ -1,12 +1,13 @@
-﻿using Domain;
+using Application.Common;
+using Application.Interfaces.Repositories;
+using Domain;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using SharedKernel;
 
 namespace Infrastructure.Repositories;
 
 public class AuditLogsRepository(IDbContextFactory<FeatureFlagsDbContext> contextFactory)
-    : BaseRepository<FeatureFlagsDbContext>(contextFactory), IRepository<AuditLog>
+    : BaseRepository<FeatureFlagsDbContext>(contextFactory), IAuditLogRepository
 {
     // GET
     public Task<AuditLog?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
@@ -15,7 +16,7 @@ public class AuditLogsRepository(IDbContextFactory<FeatureFlagsDbContext> contex
             cancellationToken);
     }
 
-    public Task<PagedResult<AuditLog>> GetPagedAsync(int first = 10, string? after = null,
+    public Task<Slice<AuditLog>> GetPagedAsync(int first = 10, string? after = null,
         string? before = null, CancellationToken cancellationToken = default)
     {
         return ExecuteAsync(async db =>
@@ -55,17 +56,14 @@ public class AuditLogsRepository(IDbContextFactory<FeatureFlagsDbContext> contex
             var hasPreviousPage =
                 !string.IsNullOrWhiteSpace(after) || (!string.IsNullOrWhiteSpace(before) && hasNextPage);
 
-            return new PagedResult<AuditLog>
+            return new Slice<AuditLog>
             {
                 Items = items,
-                PageInfo = new PageInfo
-                {
-                    HasNextPage = string.IsNullOrWhiteSpace(before) && hasNextPage,
-                    HasPreviousPage = hasPreviousPage,
-                    StartCursor = startCursor,
-                    EndCursor = endCursor,
-                    TotalCount = totalCount
-                }
+                HasNextPage = string.IsNullOrWhiteSpace(before) && hasNextPage,
+                HasPreviousPage = hasPreviousPage,
+                StartCursor = startCursor,
+                EndCursor = endCursor,
+                TotalCount = totalCount
             };
         }, cancellationToken);
     }
@@ -81,6 +79,14 @@ public class AuditLogsRepository(IDbContextFactory<FeatureFlagsDbContext> contex
         }, cancellationToken);
     }
 
+    // DELETE
+    public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return ExecuteAsync(async db => await db.AuditLogs
+            .Where(al => al.Id == id)
+            .ExecuteDeleteAsync(cancellationToken), cancellationToken);
+    }
+
     // UPDATE - not needed
     public Task<AuditLog> UpdateAsync(AuditLog auditLog, CancellationToken cancellationToken = default)
     {
@@ -90,13 +96,5 @@ public class AuditLogsRepository(IDbContextFactory<FeatureFlagsDbContext> contex
             await db.SaveChangesAsync(cancellationToken);
             return auditLog;
         }, cancellationToken);
-    }
-
-    // DELETE
-    public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        return ExecuteAsync(async db => await db.AuditLogs
-            .Where(al => al.Id == id)
-            .ExecuteDeleteAsync(cancellationToken), cancellationToken);
     }
 }

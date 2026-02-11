@@ -1,8 +1,10 @@
 using System.Security.Claims;
-using Application.DTOs;
 using Application.Exceptions;
 using Application.Interfaces;
+using Contracts.Requests;
+using Microsoft.AspNetCore.SignalR;
 using Web.Api.Extensions;
+using Web.Api.Hubs;
 
 namespace Web.Api.Endpoints.FeatureFlags;
 
@@ -11,8 +13,9 @@ public class Update : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPatch("/feature-flags/{key}",
-            async (string key, FeatureFlagDto featureFlag, HttpContext httpContext, ClaimsPrincipal user,
-                IFeatureFlagsService featureFlagsService, ILogger<Update> logger) =>
+            async (string key, UpdateFeatureFlagRequest featureFlag, HttpContext httpContext, ClaimsPrincipal user,
+                IFeatureFlagsService featureFlagsService, IHubContext<FeatureFlagHub> hubContext,
+                ILogger<Update> logger) =>
             {
                 try
                 {
@@ -63,6 +66,8 @@ public class Update : IEndpoint
                     var updatedFeatureFlag =
                         await featureFlagsService.UpdateAsync(projectId.Value, key, featureFlag, performedByUserId,
                             performedByUserEmail);
+
+                    await hubContext.Clients.Group(projectId.Value.ToString()).SendAsync("FlagChanged", key);
 
                     // Set ETag for the updated resource
                     var newETag = updatedFeatureFlag.GenerateETag();

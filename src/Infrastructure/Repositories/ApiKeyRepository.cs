@@ -59,12 +59,12 @@ public class ApiKeyRepository(IDbContextFactory<FeatureFlagsDbContext> contextFa
     // UPDATE
     public Task RevokeAsync(Guid apiKeyId, CancellationToken cancellationToken = default) // (soft-delete)
     {
-    return ExecuteAsync(async db => await db.ApiKeys
-        .Where(k => k.Id == apiKeyId)
-        .ExecuteUpdateAsync(setters => setters
-            .SetProperty(k => k.RevokedAt, DateTimeOffset.UtcNow)
-            .SetProperty(k => k.IsActive, false)
-            .SetProperty(k => k.UpdatedAt, DateTimeOffset.UtcNow), cancellationToken), cancellationToken);
+        return ExecuteAsync(async db => await db.ApiKeys
+            .Where(k => k.Id == apiKeyId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(k => k.RevokedAt, DateTimeOffset.UtcNow)
+                .SetProperty(k => k.IsActive, false)
+                .SetProperty(k => k.UpdatedAt, DateTimeOffset.UtcNow), cancellationToken), cancellationToken);
     }
 
     public Task UpdateLastUsedAtAsync(Guid apiKeyId, CancellationToken cancellationToken = default)

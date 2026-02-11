@@ -7,11 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="ApiKeys\" />
-      <Folder Include="AuditLogs\" />
-      <Folder Include="Evaluations\" />
-      <Folder Include="FeatureFlags\" />
-      <Folder Include="Projects\" />
+        <ProjectReference Include="..\Domain\Domain.csproj"/>
     </ItemGroup>
 
 </Project>

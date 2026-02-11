@@ -1,8 +1,8 @@
-﻿using Application.Interfaces.Repositories;
+using Application.Common;
+using Application.Interfaces.Repositories;
 using Domain;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using SharedKernel;
 
 namespace Infrastructure.Repositories;
 
@@ -31,7 +31,7 @@ public sealed class FeatureFlagsRepository(IDbContextFactory<FeatureFlagsDbConte
         return ExecuteAsync(db => GetByKeyCompiledQuery(db, projectId, key, cancellationToken), cancellationToken);
     }
 
-    public Task<PagedResult<FeatureFlag>> GetPagedAsync(
+    public Task<Slice<FeatureFlag>> GetPagedAsync(
         Guid projectId,
         int first = 10,
         string? after = null,
@@ -82,17 +82,14 @@ public sealed class FeatureFlagsRepository(IDbContextFactory<FeatureFlagsDbConte
             var hasPreviousPage =
                 !string.IsNullOrWhiteSpace(after) || (!string.IsNullOrWhiteSpace(before) && hasNextPage);
 
-            return new PagedResult<FeatureFlag>
+            return new Slice<FeatureFlag>
             {
                 Items = items,
-                PageInfo = new PageInfo
-                {
-                    HasNextPage = string.IsNullOrWhiteSpace(before) && hasNextPage,
-                    HasPreviousPage = hasPreviousPage,
-                    StartCursor = startCursor,
-                    EndCursor = endCursor,
-                    TotalCount = totalCount
-                }
+                HasNextPage = string.IsNullOrWhiteSpace(before) && hasNextPage,
+                HasPreviousPage = hasPreviousPage,
+                StartCursor = startCursor,
+                EndCursor = endCursor,
+                TotalCount = totalCount
             };
         }, cancellationToken);
     }

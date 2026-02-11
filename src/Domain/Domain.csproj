@@ -8,8 +8,4 @@
         <Platforms>AnyCPU</Platforms>
     </PropertyGroup>
 
-    <ItemGroup>
-        <ProjectReference Include="..\SharedKernel\SharedKernel.csproj"/>
-    </ItemGroup>
-
 </Project>

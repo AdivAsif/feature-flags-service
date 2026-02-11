@@ -1,16 +1,17 @@
-﻿using System.IO.Hashing;
+using System.IO.Hashing;
 using System.Text;
-using Application.DTOs;
 using Application.Exceptions;
 using Application.Interfaces;
 using Application.Interfaces.Repositories;
+using Contracts.Responses;
 using Domain;
+using EvaluationContext = Contracts.Models.EvaluationContext;
 
 namespace Application.Services;
 
 public sealed class EvaluationService(IFeatureFlagRepository featureFlagRepository) : IEvaluationService
 {
-    public async Task<EvaluationResultDto> EvaluateAsync(Guid projectId, string featureFlagKey,
+    public async Task<EvaluationResponse> EvaluateAsync(Guid projectId, string featureFlagKey,
         EvaluationContext context, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(featureFlagKey))
@@ -24,16 +25,25 @@ public sealed class EvaluationService(IFeatureFlagRepository featureFlagReposito
 
         var featureFlag = await featureFlagRepository.GetByKeyAsync(projectId, featureFlagKey, cancellationToken);
 
-        return EvaluationHelper(featureFlag, context);
+        return await EvaluateAsync(featureFlag, context, cancellationToken);
     }
 
-    private static EvaluationResultDto EvaluationHelper(FeatureFlag? featureFlag, EvaluationContext context)
+    public Task<EvaluationResponse> EvaluateAsync(FeatureFlag? featureFlag, EvaluationContext context,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(EvaluationHelper(featureFlag, context));
+    }
+
+    private static EvaluationResponse EvaluationHelper(FeatureFlag? featureFlag, EvaluationContext context)
     {
         if (featureFlag is null)
-            return new EvaluationResultDto(false, "Feature flag not found");
+            return new EvaluationResponse { Allowed = false, Reason = "Feature flag not found" };
 
-        var defaultResult = new EvaluationResultDto(featureFlag.Enabled,
-            featureFlag.Enabled ? "Feature flag is enabled" : "Feature flag is disabled");
+        var defaultResult = new EvaluationResponse
+        {
+            Allowed = featureFlag.Enabled,
+            Reason = featureFlag.Enabled ? "Feature flag is enabled" : "Feature flag is disabled"
+        };
 
         var rules = featureFlag.Parameters;
         if (rules.Length == 0) return defaultResult;
@@ -43,7 +53,7 @@ public sealed class EvaluationService(IFeatureFlagRepository featureFlagReposito
             var rule = rules[i];
             if (rule.RuleType != RuleType.User) continue;
             if (IsValueInCommaSeparatedList(rule.RuleValue, context.UserId))
-                return new EvaluationResultDto(featureFlag.Enabled, "User is explicitly targeted");
+                return new EvaluationResponse { Allowed = featureFlag.Enabled, Reason = "User is explicitly targeted" };
         }
 
         // 2. Check if user belongs to any required groups
@@ -68,7 +78,7 @@ public sealed class EvaluationService(IFeatureFlagRepository featureFlagReposito
         }
 
         if (groupRuleExists && matchedGroup == null)
-            return new EvaluationResultDto(false, "User not in required group");
+            return new EvaluationResponse { Allowed = false, Reason = "User not in required group" };
 
         // 3. Percentage rollout
         for (var i = 0; i < rules.Length; i++)
@@ -82,20 +92,21 @@ public sealed class EvaluationService(IFeatureFlagRepository featureFlagReposito
                 var reason = matchedGroup != null
                     ? $"User in '{matchedGroup}' group and within {percentageValue}% rollout"
                     : $"User within {percentageValue}% rollout";
-                return new EvaluationResultDto(featureFlag.Enabled, reason);
+                return new EvaluationResponse { Allowed = featureFlag.Enabled, Reason = reason };
             }
             else
             {
                 var reason = matchedGroup != null
                     ? $"User in '{matchedGroup}' group but outside {percentageValue}% rollout"
                     : $"User outside {percentageValue}% rollout";
-                return new EvaluationResultDto(false, reason);
+                return new EvaluationResponse { Allowed = false, Reason = reason };
             }
         }
 
         // 4. If user is in required group but no percentage rule, allow
         return matchedGroup != null
-            ? new EvaluationResultDto(featureFlag.Enabled, $"User in required group '{matchedGroup}'")
+            ? new EvaluationResponse
+                { Allowed = featureFlag.Enabled, Reason = $"User in required group '{matchedGroup}'" }
             : defaultResult;
     }
 

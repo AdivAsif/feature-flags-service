@@ -1,9 +1,10 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Application.DTOs;
+using System.Text.Json;
 using Application.Interfaces;
 using Application.Interfaces.Repositories;
+using Application.Mappers;
 using Application.Services;
 using Asp.Versioning;
 using Domain;
@@ -23,9 +24,10 @@ using OpenTelemetry.Trace;
 using Prometheus;
 using Scalar.AspNetCore;
 using Serilog;
-using SharedKernel;
 using StackExchange.Redis;
 using Web.Api.Extensions;
+using Web.Api.Hubs;
+using Web.Api.JsonContexts;
 using Web.Api.Middleware;
 using Web.Api.Services;
 using ZiggyCreatures.Caching.Fusion;
@@ -106,9 +108,20 @@ builder.Services.AddPooledDbContextFactory<FeatureFlagsDbContext>(options =>
 
 // Register base repositories
 builder.Services.AddScoped<IFeatureFlagRepository, FeatureFlagsRepository>();
-builder.Services.AddScoped<IRepository<AuditLog>, AuditLogsRepository>();
+builder.Services.AddScoped<IAuditLogRepository, AuditLogsRepository>();
 builder.Services.AddScoped<IProjectRepository, ProjectRepository>();
 builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
+
+// Register services BEFORE decorators
+builder.Services.AddSingleton<ApiKeyUsageQueue>();
+builder.Services.AddHostedService<ApiKeyUsageBackgroundService>();
+builder.Services.AddHostedService<ApiKeyUsageCleanupService>();
+builder.Services.AddSingleton<FeatureFlagMapper>();
+builder.Services.AddSingleton<AuditLogMapper>();
+builder.Services.AddScoped<IProjectService, ProjectService>();
+builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
+builder.Services.AddScoped<IFeatureFlagsService, FeatureFlagsService>();
+builder.Services.AddScoped<IEvaluationService, EvaluationService>();
 
 // Register cached repositories and services as decorators
 builder.Services.Decorate<IFeatureFlagRepository, CachedFeatureFlagRepository>();
@@ -116,14 +129,6 @@ builder.Services.Decorate<IProjectRepository, CachedProjectRepository>();
 builder.Services.Decorate<IApiKeyRepository, CachedApiKeyRepository>();
 builder.Services.Decorate<IEvaluationService, CachedEvaluationService>();
 
-builder.Services.AddSingleton<ApiKeyUsageQueue>();
-builder.Services.AddHostedService<ApiKeyUsageBackgroundService>();
-builder.Services.AddSingleton<FeatureFlagMapper>();
-builder.Services.AddSingleton<AuditLogMapper>();
-builder.Services.AddScoped<IProjectService, ProjectService>();
-builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
-builder.Services.AddScoped<IFeatureFlagsService, FeatureFlagsService>();
-builder.Services.AddScoped<IEvaluationService, EvaluationService>();
 builder.Services.AddScoped<IAuditLogsService, AuditLogsService>();
 builder.Services.AddSingleton<AuditLogQueue>();
 builder.Services.AddHostedService<AuditLogBackgroundService>();
@@ -195,7 +200,10 @@ builder.Services.AddFusionCache()
         JitterMaxDuration = TimeSpan.FromMilliseconds(100)
     })
     .WithSerializer(
-        new FusionCacheSystemTextJsonSerializer())
+        new FusionCacheSystemTextJsonSerializer(new JsonSerializerOptions
+        {
+            TypeInfoResolver = ApiJsonContext.Default
+        }))
     .WithDistributedCache(instrumentedRedisCache)
     .WithBackplane(
         new RedisBackplane(new RedisBackplaneOptions
@@ -205,9 +213,17 @@ builder.Services.AddFusionCache()
                                 "Connection string 'FeatureFlagsCache' not found.")
         })
     );
+builder.Services.AddSignalR().AddStackExchangeRedis(builder.Configuration.GetConnectionString("FeatureFlagsCache") ??
+                                                    throw new InvalidOperationException(
+                                                        "Connection string 'FeatureFlagsCache' not found."));
 
-builder.Services.AddJwtBearerAuthentication(builder.Configuration);
-builder.Services.AddApiKeyAuthentication();
+builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearerAuthentication(builder.Configuration)
+    .AddApiKeyAuthentication();
 
 // Configure authorization policies
 builder.Services.AddAuthorizationBuilder()
@@ -223,26 +239,14 @@ builder.Services.AddAuthorizationBuilder()
     {
         policy.AddAuthenticationSchemes(JwtBearerDefaults
             .AuthenticationScheme);
-        policy.RequireAssertion(context =>
-        {
-            // Check for role claim in any format (short or XML URI)
-            var hasAdminRole = context.User.HasClaim(c =>
-                c.Type is "role" or ClaimTypes.Role && c.Value == "admin");
-            return hasAdminRole;
-        });
+        policy.RequireRole("admin");
     })
     // Configure authorization policies
     .AddPolicy("User", policy =>
     {
         policy.AddAuthenticationSchemes(JwtBearerDefaults
             .AuthenticationScheme);
-        policy.RequireAssertion(context =>
-        {
-            var hasUserRole = context.User.HasClaim(c =>
-                c.Type is "role" or ClaimTypes.Role &&
-                c.Value is "user" or "admin");
-            return hasUserRole;
-        });
+        policy.RequireRole("user", "admin");
     })
     // Configure authorization policies
     .AddPolicy("ReadAccess", policy =>
@@ -257,10 +261,9 @@ builder.Services.AddAuthorizationBuilder()
                 c.Type == "scope" && c.Value.Split(' ').Contains("flags:read"));
 
             // JWT with user or admin role
-            var isUser = context.User.HasClaim("role", "user");
-            var isAdmin = context.User.HasClaim("role", "admin");
+            var isUserOrAdmin = context.User.IsInRole("user") || context.User.IsInRole("admin");
 
-            return hasReadScope || isUser || isAdmin;
+            return hasReadScope || isUserOrAdmin;
         });
     })
     // Configure authorization policies
@@ -276,7 +279,7 @@ builder.Services.AddAuthorizationBuilder()
                 c.Type == "scope" && c.Value.Split(' ').Contains("flags:write"));
 
             // JWT with admin role
-            var isAdmin = context.User.HasClaim("role", "admin");
+            var isAdmin = context.User.IsInRole("admin");
 
             return hasWriteScope || isAdmin;
         });
@@ -294,7 +297,7 @@ builder.Services.AddAuthorizationBuilder()
                 c.Type == "scope" && c.Value.Split(' ').Contains("flags:delete"));
 
             // JWT with admin role
-            var isAdmin = context.User.HasClaim("role", "admin");
+            var isAdmin = context.User.IsInRole("admin");
 
             return hasDeleteScope || isAdmin;
         });
@@ -325,15 +328,20 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.MapScalarApiReference();
+}
 
+if (app.Environment.IsDevelopment() || (builder.Configuration.GetValue<bool>("EnableDevToken") &&
+                                        !string.IsNullOrWhiteSpace(
+                                            builder.Configuration.GetValue<string>("JwtSecretKey"))))
     app.MapPost("/dev/token", ([FromBody] DevTokenRequest devTokenRequest, ILogger<Program> loggerInput) =>
     {
+        var roleClaimType = builder.Configuration["Auth:RoleClaimType"] ?? "role";
         var claims = new[]
         {
             new Claim("sub", devTokenRequest.UserId),
             new Claim("email", devTokenRequest.Email),
             new Claim("scope", string.Join(" ", devTokenRequest.Scopes)),
-            new Claim("role", devTokenRequest.Role)
+            new Claim(roleClaimType, devTokenRequest.Role)
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
@@ -352,7 +360,6 @@ if (app.Environment.IsDevelopment())
 
         return Results.Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token), expires = token.ValidTo });
     }).AllowAnonymous();
-}
 
 app.MapHealthChecks("/health");
 // Prometheus metrics endpoint - this is before the Authorization and Middleware registrations to make sure prometheus metrics are more accurate
@@ -363,6 +370,7 @@ app.UseAuthentication();
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.UseMiddleware<ETagMiddleware>();
+app.MapHub<FeatureFlagHub>("/api/hubs/feature-flags").RequireAuthorization();
 
 var api = app.NewVersionedApi();
 var v1 = api.MapGroup("/api").HasApiVersion(new ApiVersion(1, 0));

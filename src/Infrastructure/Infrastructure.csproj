@@ -23,6 +23,7 @@
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0"/>
         <PackageReference Include="StackExchange.Redis" Version="2.10.1"/>
         <PackageReference Include="ZiggyCreatures.FusionCache" Version="2.5.0"/>
+        <PackageReference Include="ZString" Version="2.6.0" />
     </ItemGroup>
 
     <ItemGroup>
@@ -32,6 +33,7 @@
     <ItemGroup>
         <ProjectReference Include="..\Domain\Domain.csproj"/>
         <ProjectReference Include="..\Application\Application.csproj"/>
+        <ProjectReference Include="..\Contracts\Contracts.csproj"/>
     </ItemGroup>
 
     <ItemGroup>

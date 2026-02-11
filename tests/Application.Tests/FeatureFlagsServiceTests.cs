@@ -1,19 +1,19 @@
-using Application.DTOs;
+using Application.Common;
 using Application.Exceptions;
 using Application.Interfaces;
 using Application.Interfaces.Repositories;
+using Application.Mappers;
 using Application.Services;
+using Contracts.Requests;
 using Domain;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using SharedKernel;
 
 namespace Application.Tests;
 
 public class FeatureFlagsServiceTests
 {
-    private readonly AuditLogQueue _auditLogQueue;
     private readonly IFeatureFlagRepository _repository;
     private readonly IFeatureFlagsService _service;
     private readonly Guid _testProjectId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -22,9 +22,9 @@ public class FeatureFlagsServiceTests
     {
         _repository = Substitute.For<IFeatureFlagRepository>();
         var logger = Substitute.For<ILogger<AuditLogQueue>>();
-        _auditLogQueue = new AuditLogQueue(logger);
+        var auditLogQueue = new AuditLogQueue(logger);
         var mapper = new FeatureFlagMapper();
-        _service = new FeatureFlagsService(_repository, mapper, _auditLogQueue);
+        _service = new FeatureFlagsService(_repository, mapper, auditLogQueue);
     }
 
     #region GetPagedAsync Tests
@@ -46,19 +46,17 @@ public class FeatureFlagsServiceTests
                 CreatedAt = DateTimeOffset.UtcNow
             }
         };
-        var pagedResult = new PagedResult<FeatureFlag>
+        var pagedResult = new Slice<FeatureFlag>
         {
             Items = featureFlags,
-            PageInfo = new PageInfo
-            {
-                HasNextPage = false,
-                HasPreviousPage = false,
-                TotalCount = 2,
-                StartCursor = "cursor1",
-                EndCursor = "cursor2"
-            }
+            HasNextPage = false,
+            HasPreviousPage = false,
+            TotalCount = 2,
+            StartCursor = "cursor1",
+            EndCursor = "cursor2"
         };
-        _repository.GetPagedAsync(Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<string?>())
+        _repository.GetPagedAsync(Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
             .Returns(pagedResult);
 
         // Act
@@ -67,8 +65,8 @@ public class FeatureFlagsServiceTests
         // Assert
         result.Should().NotBeNull();
         result.Items.Should().HaveCount(2);
-        result.PageInfo.TotalCount.Should().Be(2);
-        result.PageInfo.HasNextPage.Should().BeFalse();
+        result.TotalCount.Should().Be(2);
+        result.HasNextPage.Should().BeFalse();
     }
 
     #endregion
@@ -170,13 +168,8 @@ public class FeatureFlagsServiceTests
     public async Task CreateAsync_WithValidData_ShouldCreateFeatureFlag()
     {
         // Arrange
-        var dto = new FeatureFlagDto
-        {
-            Key = "new-feature",
-            Description = "New feature",
-            Enabled = true,
-            Parameters = Array.Empty<FeatureFlagParameters>()
-        };
+        var dto = new CreateFeatureFlagRequest("new-feature", "New feature", true,
+            Array.Empty<FeatureFlagParameters>());
         _repository.GetByKeyAsync(_testProjectId, dto.Key).Returns((FeatureFlag?)null);
         _repository.CreateAsync(Arg.Any<FeatureFlag>()).Returns(call =>
         {
@@ -201,7 +194,7 @@ public class FeatureFlagsServiceTests
     public async Task CreateAsync_WithNullKey_ShouldThrowBadRequestException()
     {
         // Arrange
-        var dto = new FeatureFlagDto { Key = null! };
+        var dto = new CreateFeatureFlagRequest(null!, string.Empty);
 
         // Act
         var act = async () => await _service.CreateAsync(_testProjectId, dto);
@@ -215,7 +208,7 @@ public class FeatureFlagsServiceTests
     public async Task CreateAsync_WithExistingKey_ShouldThrowBadRequestException()
     {
         // Arrange
-        var dto = new FeatureFlagDto { Key = "existing-feature" };
+        var dto = new CreateFeatureFlagRequest("existing-feature");
         var existingFlag = new FeatureFlag { Key = "existing-feature", ProjectId = _testProjectId };
         _repository.GetByKeyAsync(_testProjectId, dto.Key).Returns(existingFlag);
 
@@ -235,7 +228,7 @@ public class FeatureFlagsServiceTests
     public async Task UpdateAsync_WithValidData_ShouldUpdateFeatureFlag()
     {
         // Arrange
-        var key = "test-feature";
+        const string key = "test-feature";
         var existingFlag = new FeatureFlag
         {
             Id = Guid.NewGuid(),
@@ -246,13 +239,7 @@ public class FeatureFlagsServiceTests
             Version = 1,
             CreatedAt = DateTimeOffset.UtcNow
         };
-        var dto = new FeatureFlagDto
-        {
-            Key = key,
-            Description = "Updated description",
-            Enabled = true,
-            Parameters = Array.Empty<FeatureFlagParameters>()
-        };
+        var dto = new UpdateFeatureFlagRequest("Updated description", true, Array.Empty<FeatureFlagParameters>());
         _repository.GetByKeyAsync(_testProjectId, key).Returns(existingFlag);
         _repository.UpdateAsync(Arg.Any<FeatureFlag>()).Returns(call => call.Arg<FeatureFlag>());
 
@@ -271,7 +258,7 @@ public class FeatureFlagsServiceTests
     public async Task UpdateAsync_WithEmptyKey_ShouldThrowBadRequestException()
     {
         // Arrange
-        var dto = new FeatureFlagDto();
+        var dto = new UpdateFeatureFlagRequest("Updated description", true, Array.Empty<FeatureFlagParameters>());
 
         // Act
         var act = async () => await _service.UpdateAsync(_testProjectId, "", dto);
@@ -285,8 +272,8 @@ public class FeatureFlagsServiceTests
     public async Task UpdateAsync_WithNonExistentKey_ShouldThrowNotFoundException()
     {
         // Arrange
-        var key = "non-existent";
-        var dto = new FeatureFlagDto { Key = key };
+        const string key = "non-existent";
+        var dto = new UpdateFeatureFlagRequest("Updated description", true, Array.Empty<FeatureFlagParameters>());
         _repository.GetByKeyAsync(_testProjectId, key).Returns((FeatureFlag?)null);
 
         // Act
@@ -294,24 +281,6 @@ public class FeatureFlagsServiceTests
 
         // Assert
         await act.Should().ThrowAsync<NotFoundException>();
-    }
-
-    [Fact]
-    public async Task UpdateAsync_WithDifferentKey_ShouldThrowBadRequestException()
-    {
-        // Arrange
-        var existingKey = "original-key";
-        var newKey = "different-key";
-        var existingFlag = new FeatureFlag { Key = existingKey, ProjectId = _testProjectId };
-        var dto = new FeatureFlagDto { Key = newKey };
-        _repository.GetByKeyAsync(_testProjectId, existingKey).Returns(existingFlag);
-
-        // Act
-        var act = async () => await _service.UpdateAsync(_testProjectId, existingKey, dto);
-
-        // Assert
-        await act.Should().ThrowAsync<BadRequestException>()
-            .WithMessage("*Changing a Feature Flag key is not allowed*");
     }
 
     #endregion
@@ -322,7 +291,7 @@ public class FeatureFlagsServiceTests
     public async Task DeleteByKeyAsync_WithValidKey_ShouldDeleteFeatureFlag()
     {
         // Arrange
-        var key = "test-feature";
+        const string key = "test-feature";
         var id = Guid.NewGuid();
         var featureFlag = new FeatureFlag { Id = id, Key = key, ProjectId = _testProjectId };
         _repository.GetByKeyAsync(_testProjectId, key).Returns(featureFlag);
@@ -338,7 +307,7 @@ public class FeatureFlagsServiceTests
     public async Task DeleteByKeyAsync_WithNonExistentKey_ShouldThrowNotFoundException()
     {
         // Arrange
-        var key = "non-existent";
+        const string key = "non-existent";
         _repository.GetByKeyAsync(_testProjectId, key).Returns((FeatureFlag?)null);
 
         // Act

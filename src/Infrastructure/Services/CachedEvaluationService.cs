@@ -1,7 +1,7 @@
-using Application.DTOs;
 using Application.Interfaces;
 using Application.Interfaces.Repositories;
-using Domain;
+using Contracts.Models;
+using Contracts.Responses;
 using Infrastructure.Caching;
 using ZiggyCreatures.Caching.Fusion;
 
@@ -15,7 +15,7 @@ namespace Infrastructure.Services;
 ///     - Cache key includes flag version for automatic invalidation
 ///     - Background operations enabled
 /// </summary>
-public abstract class CachedEvaluationService(
+public sealed class CachedEvaluationService(
     IEvaluationService innerService,
     IFusionCache cache,
     IFeatureFlagRepository flagRepository) : IEvaluationService
@@ -25,18 +25,16 @@ public abstract class CachedEvaluationService(
         Duration = TimeSpan.FromMinutes(5),
         DistributedCacheDuration = TimeSpan.FromMinutes(30),
         IsFailSafeEnabled = false,
-        // FailSafeMaxDuration = TimeSpan.FromHours(1),
+        FailSafeMaxDuration = TimeSpan.FromHours(1),
         AllowBackgroundDistributedCacheOperations = true,
         Size = 1,
 
-        // FactorySoftTimeout = TimeSpan.FromMilliseconds(10),
-        // FactoryHardTimeout = TimeSpan.FromMilliseconds(50),
-        FactorySoftTimeout = Timeout.InfiniteTimeSpan,
-        FactoryHardTimeout = Timeout.InfiniteTimeSpan,
+        FactorySoftTimeout = TimeSpan.FromMilliseconds(100),
+        FactoryHardTimeout = TimeSpan.FromMilliseconds(500),
         EagerRefreshThreshold = null
     };
 
-    public async Task<EvaluationResultDto> EvaluateAsync(Guid projectId, string featureFlagKey,
+    public async Task<EvaluationResponse> EvaluateAsync(Guid projectId, string featureFlagKey,
         EvaluationContext context, CancellationToken cancellationToken = default)
     {
         // Fetch flag to get version for cache key. 
@@ -53,8 +51,16 @@ public abstract class CachedEvaluationService(
 
         return await cache.GetOrSetAsync(
             cacheKey,
-            async ct => await innerService.EvaluateAsync(projectId, featureFlagKey, context, ct),
+            // Optimization: Pass the already-fetched flag to avoid double DB lookup
+            async ct => await innerService.EvaluateAsync(flag, context, ct),
             CacheOptions,
             cancellationToken);
+    }
+
+    public Task<EvaluationResponse> EvaluateAsync(Domain.FeatureFlag featureFlag, EvaluationContext context,
+        CancellationToken cancellationToken = default)
+    {
+        // Direct pass-through for the overload, though typically the cached path enters via key
+        return innerService.EvaluateAsync(featureFlag, context, cancellationToken);
     }
 }

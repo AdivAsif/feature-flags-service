@@ -1,22 +1,24 @@
-﻿using Application.DTOs;
+using Application.Common;
 using Application.Exceptions;
 using Application.Interfaces;
+using Application.Interfaces.Repositories;
+using Application.Mappers;
 using Application.Services;
+using Contracts.Responses;
 using Domain;
 using FluentAssertions;
 using NSubstitute;
-using SharedKernel;
 
 namespace Application.Tests;
 
 public class AuditLogsServiceTests
 {
-    private readonly IRepository<AuditLog> _repository;
+    private readonly IAuditLogRepository _repository;
     private readonly IAuditLogsService _service;
 
     public AuditLogsServiceTests()
     {
-        _repository = Substitute.For<IRepository<AuditLog>>();
+        _repository = Substitute.For<IAuditLogRepository>();
         var mapper = new AuditLogMapper();
         _service = new AuditLogsService(_repository, mapper);
     }
@@ -36,22 +38,19 @@ public class AuditLogsServiceTests
                 FeatureFlagId = featureFlagId,
                 Action = AuditLogAction.Create,
                 NewStateJson = "{\"enabled\":true}",
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = DateTimeOffset.UtcNow,
                 PerformedByUserId = "user1",
                 PerformedByUserEmail = "user1@example.com"
             }
         };
-        var pagedResult = new PagedResult<AuditLog>
+        var pagedResult = new Slice<AuditLog>
         {
             Items = auditLogs,
-            PageInfo = new PageInfo
-            {
-                HasNextPage = false,
-                HasPreviousPage = false,
-                TotalCount = 1,
-                StartCursor = "cursor1",
-                EndCursor = "cursor1"
-            }
+            HasNextPage = false,
+            HasPreviousPage = false,
+            TotalCount = 1,
+            StartCursor = "cursor1",
+            EndCursor = "cursor1"
         };
         _repository.GetPagedAsync().Returns(pagedResult);
 
@@ -61,8 +60,8 @@ public class AuditLogsServiceTests
         // Assert
         result.Should().NotBeNull();
         result.Items.Should().HaveCount(1);
-        result.PageInfo.TotalCount.Should().Be(1);
-        result.PageInfo.HasNextPage.Should().BeFalse();
+        result.TotalCount.Should().Be(1);
+        result.HasNextPage.Should().BeFalse();
     }
 
     #endregion
@@ -81,7 +80,7 @@ public class AuditLogsServiceTests
             FeatureFlagId = featureFlagId,
             Action = AuditLogAction.Create,
             NewStateJson = "{\"enabled\":true}",
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
             PerformedByUserId = "user123",
             PerformedByUserEmail = "user@example.com"
         };
@@ -122,14 +121,14 @@ public class AuditLogsServiceTests
     {
         // Arrange
         var featureFlagId = Guid.NewGuid();
-        var dto = new AuditLogDto
+        var dto = new AuditLogResponse
         {
             FeatureFlagId = featureFlagId,
             Action = AuditLogAction.Create,
             NewStateJson = "{\"enabled\":true}",
             PerformedByUserId = "user123",
             PerformedByUserEmail = "user@example.com",
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         };
         _repository.CreateAsync(Arg.Any<AuditLog>()).Returns(call =>
         {
@@ -153,14 +152,14 @@ public class AuditLogsServiceTests
     {
         // Arrange
         var featureFlagId = Guid.NewGuid();
-        var dto = new AuditLogDto
+        var dto = new AuditLogResponse
         {
             FeatureFlagId = featureFlagId,
             Action = AuditLogAction.Delete,
             PreviousStateJson = "{\"enabled\":true}",
             PerformedByUserId = "user123",
             PerformedByUserEmail = "user@example.com",
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         };
         _repository.CreateAsync(Arg.Any<AuditLog>()).Returns(call =>
         {
@@ -184,7 +183,7 @@ public class AuditLogsServiceTests
     {
         // Arrange
         var featureFlagId = Guid.NewGuid();
-        var dto = new AuditLogDto
+        var dto = new AuditLogResponse
         {
             FeatureFlagId = featureFlagId,
             Action = AuditLogAction.Update,
@@ -192,7 +191,7 @@ public class AuditLogsServiceTests
             NewStateJson = "{\"enabled\":false}",
             PerformedByUserId = "user123",
             PerformedByUserEmail = "user@example.com",
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         };
         _repository.CreateAsync(Arg.Any<AuditLog>()).Returns(call =>
         {
@@ -217,7 +216,7 @@ public class AuditLogsServiceTests
     public async Task AppendAsync_WithNoStateJson_ShouldThrowBadRequestException()
     {
         // Arrange
-        var dto = new AuditLogDto
+        var dto = new AuditLogResponse
         {
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Create,
@@ -248,7 +247,7 @@ public class AuditLogsServiceTests
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Create,
             NewStateJson = "{\"enabled\":true}",
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
             PerformedByUserId = "user123",
             PerformedByUserEmail = "user@example.com"
         };

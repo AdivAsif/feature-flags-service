@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.IO.Hashing;
 using System.Text;
+using Cysharp.Text;
 
 namespace Infrastructure.Caching;
 
@@ -14,28 +15,28 @@ public static class CacheKeys
     // API Key cache keys
     public static string ApiKey(string hashedKey)
     {
-        return $"apikey:{hashedKey}";
+        return ZString.Concat("apikey:", hashedKey);
     }
 
     public static string ApiKeyById(Guid id)
     {
-        return $"apikey:id:{id}";
+        return ZString.Concat("apikey:id:", id);
     }
 
     public static string ApiKeysByProject(Guid projectId)
     {
-        return $"apikey:project:{projectId}";
+        return ZString.Concat("apikey:project:", projectId);
     }
 
     // Project cache keys
     public static string Project(Guid projectId)
     {
-        return $"project:{projectId}";
+        return ZString.Concat("project:", projectId);
     }
 
     public static string ProjectByName(string projectName)
     {
-        return $"project:name:{projectName.Trim().ToUpperInvariant()}";
+        return ZString.Concat("project:name:", projectName.Trim().ToUpperInvariant());
     }
 
     public static string AllProjects()
@@ -46,25 +47,26 @@ public static class CacheKeys
     // Feature Flag cache keys
     public static string Flag(Guid projectId, Guid flagId)
     {
-        return $"flag:{projectId}:{flagId}";
+        return ZString.Concat("flag:", projectId, ":", flagId);
     }
 
     public static string FlagByKey(Guid projectId, string flagKey)
     {
-        return $"flag:{projectId}:key:{flagKey}";
+        return ZString.Concat("flag:", projectId, ":key:", flagKey);
     }
 
     public static string FlagsByProject(Guid projectId)
     {
-        return $"flag:project:{projectId}";
+        return ZString.Concat("flag:project:", projectId);
     }
 
     // Evaluation cache keys
     public static string Evaluation(Guid projectId, string flagKey, string userId, int flagVersion,
         ulong? contextHash = null)
     {
-        var baseKey = $"eval:{projectId}:{flagKey}:v{flagVersion}:{userId}";
-        return contextHash != null ? $"{baseKey}:{contextHash}" : baseKey;
+        return contextHash != null
+            ? ZString.Concat("eval:", projectId, ":", flagKey, ":v", flagVersion, ":", userId, ":", contextHash)
+            : ZString.Concat("eval:", projectId, ":", flagKey, ":v", flagVersion, ":", userId);
     }
 
     /// <summary>

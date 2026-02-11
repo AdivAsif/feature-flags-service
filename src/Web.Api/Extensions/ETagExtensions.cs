@@ -1,12 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
-using Application.DTOs;
+using Contracts.Responses;
 
 namespace Web.Api.Extensions;
 
 public static class ETagExtensions
 {
-    public static string GenerateETag(this FeatureFlagDto featureFlag)
+    public static string GenerateETag(this FeatureFlagResponse featureFlag)
     {
         var versionString = $"{featureFlag.Id}-{featureFlag.Version}";
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(versionString));

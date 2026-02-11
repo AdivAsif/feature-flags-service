@@ -1,4 +1,5 @@
-﻿using Application.Interfaces;
+using Application.Interfaces;
+using Web.Api.Extensions;
 
 namespace Web.Api.Endpoints.AuditLogs;
 
@@ -17,9 +18,9 @@ public class GetAll : IEndpoint
                     "Getting audit logs with cursor pagination (first: {First}, after: {After}, before: {Before})",
                     first, after ?? "null", before ?? "null");
 
-                var pagedResult = await auditLogsService.GetPagedAsync(first, after, before);
+                var slice = await auditLogsService.GetPagedAsync(first, after, before);
 
-                return Results.Ok(pagedResult);
+                return Results.Ok(slice.ToPagedResult());
             })
             .WithName("GetAllAuditLogs")
             .RequireAuthorization("ReadAccess");

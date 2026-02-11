@@ -78,6 +78,52 @@
       - renderer
     networks:
       - feature-flags-network
+  
+  chaos-monkey:
+    image: alpine:latest
+    container_name: chaos_monkey
+    networks:
+      - feature-flags-network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: >
+      sh -c "apk add --no-cache docker-cli &&
+      echo 'Chaos Monkey Started - Will randomly pause/unpause Redis and Postgres' &&
+      while true; do
+        SLEEP_TIME=$$((5 + RANDOM % 6));
+        echo 'Sleeping for '$$SLEEP_TIME' seconds...';
+        sleep $$SLEEP_TIME;
+
+        if [ $$((RANDOM % 2)) -eq 0 ]; then
+          TARGET='feature_flags_cache';
+          SERVICE_NAME='Redis';
+        else
+          TARGET='feature_flags_db';
+          SERVICE_NAME='Postgres';
+        fi;
+
+        ACTION=$$((RANDOM % 3));
+
+        if [ $$ACTION -eq 0 ]; then
+          echo '[CHAOS] Pausing '$$SERVICE_NAME'...';
+          docker pause $$TARGET 2>/dev/null || echo 'Failed to pause '$$SERVICE_NAME;
+          sleep $$((10 + RANDOM % 20));
+          echo '[CHAOS] Unpausing '$$SERVICE_NAME'...';
+          docker unpause $$TARGET 2>/dev/null || echo 'Failed to unpause '$$SERVICE_NAME;
+        elif [ $$ACTION -eq 1 ]; then
+          echo '[CHAOS] Stopping '$$SERVICE_NAME'...';
+          docker stop -t 2 $$TARGET 2>/dev/null || echo 'Failed to stop '$$SERVICE_NAME;
+          sleep $$((5 + RANDOM % 10));
+          echo '[CHAOS] Starting '$$SERVICE_NAME'...';
+          docker start $$TARGET 2>/dev/null || echo 'Failed to start '$$SERVICE_NAME;
+        else
+          echo '[CHAOS] Restarting '$$SERVICE_NAME'...';
+          docker restart -t 2 $$TARGET 2>/dev/null || echo 'Failed to restart '$$SERVICE_NAME;
+        fi;
+      done"
+    profiles:
+      - with-chaos
+    restart: unless-stopped
 
 networks:
   feature-flags-network:

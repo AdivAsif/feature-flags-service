@@ -1,7 +1,7 @@
+using Application.Common;
 using Application.Interfaces.Repositories;
 using Domain;
 using Infrastructure.Caching;
-using SharedKernel;
 using ZiggyCreatures.Caching.Fusion;
 
 namespace Infrastructure.Repositories;
@@ -51,7 +51,7 @@ public class CachedFeatureFlagRepository(IFeatureFlagRepository innerRepository,
             cancellationToken);
     }
 
-    public Task<PagedResult<FeatureFlag>> GetPagedAsync(Guid projectId, int first = 10, string? after = null,
+    public Task<Slice<FeatureFlag>> GetPagedAsync(Guid projectId, int first = 10, string? after = null,
         string? before = null, CancellationToken cancellationToken = default)
     {
         return innerRepository.GetPagedAsync(projectId, first, after, before, cancellationToken);

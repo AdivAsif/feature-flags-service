@@ -1,5 +1,5 @@
-using Application.DTOs;
 using Application.Services;
+using Contracts.Responses;
 using Domain;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -9,25 +9,24 @@ namespace Application.Tests;
 
 public class AuditLogQueueTests
 {
-    private readonly ILogger<AuditLogQueue> _logger;
     private readonly AuditLogQueue _queue;
 
     public AuditLogQueueTests()
     {
-        _logger = Substitute.For<ILogger<AuditLogQueue>>();
-        _queue = new AuditLogQueue(_logger);
+        var logger = Substitute.For<ILogger<AuditLogQueue>>();
+        _queue = new AuditLogQueue(logger);
     }
 
     [Fact]
     public async Task QueueAuditLogAsync_ShouldSuccessfullyQueueAuditLog()
     {
         // Arrange
-        var auditLog = new AuditLogDto
+        var auditLog = new AuditLogResponse
         {
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Create,
             NewStateJson = "{\"enabled\":true}",
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
             PerformedByUserId = "user123",
             PerformedByUserEmail = "user@example.com"
         };
@@ -48,22 +47,22 @@ public class AuditLogQueueTests
     public async Task QueueAuditLogAsync_ShouldQueueMultipleAuditLogs()
     {
         // Arrange
-        var auditLog1 = new AuditLogDto
+        var auditLog1 = new AuditLogResponse
         {
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Create,
             NewStateJson = "{\"enabled\":true}",
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
             PerformedByUserId = "user1",
             PerformedByUserEmail = "user1@example.com"
         };
-        var auditLog2 = new AuditLogDto
+        var auditLog2 = new AuditLogResponse
         {
             FeatureFlagId = Guid.NewGuid(),
             Action = AuditLogAction.Update,
             PreviousStateJson = "{\"enabled\":true}",
             NewStateJson = "{\"enabled\":false}",
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
             PerformedByUserId = "user2",
             PerformedByUserEmail = "user2@example.com"
         };

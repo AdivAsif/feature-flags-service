@@ -1,19 +1,18 @@
 using Infrastructure.Authentication;
-using Infrastructure.Repositories;
+using Microsoft.AspNetCore.Authentication;
 
 namespace Web.Api.Extensions;
 
 public static class ApiKeyAuthenticationExtensions
 {
-    public static IServiceCollection AddApiKeyAuthentication(this IServiceCollection services)
+    public static AuthenticationBuilder AddApiKeyAuthentication(this AuthenticationBuilder builder)
     {
-        services.AddScoped<ApiKeyRepository>();
+        // builder.Services.AddScoped<ApiKeyRepository>();
 
-        services.AddAuthentication()
-            .AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>(
-                ApiKeyAuthenticationOptions.DefaultScheme,
-                options => { });
+        builder.AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>(
+            ApiKeyAuthenticationOptions.DefaultScheme,
+            options => { });
 
-        return services;
+        return builder;
     }
 }

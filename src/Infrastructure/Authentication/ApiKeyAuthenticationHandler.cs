@@ -12,10 +12,18 @@ namespace Infrastructure.Authentication;
 public class ApiKeyAuthenticationOptions : AuthenticationSchemeOptions
 {
     public const string DefaultScheme = "ApiKey";
-    public string HeaderName { get; set; } = "X-Api-Key";
+    public static string HeaderName => "X-Api-Key";
 }
 
-public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthenticationOptions>
+public class ApiKeyAuthenticationHandler(
+    IOptionsMonitor<ApiKeyAuthenticationOptions> options,
+    ILoggerFactory logger,
+    UrlEncoder encoder,
+    ISystemClock clock,
+    IApiKeyRepository apiKeyRepository,
+    ApiKeyUsageQueue apiKeyUsageQueue,
+    IFusionCache cache)
+    : AuthenticationHandler<ApiKeyAuthenticationOptions>(options, logger, encoder, clock)
 {
     private static readonly FusionCacheEntryOptions AuthCacheOptions = new()
     {
@@ -25,49 +33,37 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
         SkipDistributedCacheWrite = true
     };
 
-    private readonly IApiKeyRepository _apiKeyRepository;
-    private readonly ApiKeyUsageQueue _apiKeyUsageQueue;
-    private readonly IFusionCache _cache;
-
-    public ApiKeyAuthenticationHandler(
-        IOptionsMonitor<ApiKeyAuthenticationOptions> options,
-        ILoggerFactory logger,
-        UrlEncoder encoder,
-        ISystemClock clock,
-        IApiKeyRepository apiKeyRepository,
-        ApiKeyUsageQueue apiKeyUsageQueue,
-        IFusionCache cache)
-        : base(options, logger, encoder, clock)
-    {
-        _apiKeyRepository = apiKeyRepository;
-        _apiKeyUsageQueue = apiKeyUsageQueue;
-        _cache = cache;
-    }
-
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        // Try to get API key from custom header first
-        if (!Request.Headers.TryGetValue(Options.HeaderName, out var apiKeyHeaderValues))
+        // Try custom header first
+        if (Request.Headers.TryGetValue(ApiKeyAuthenticationOptions.HeaderName, out var apiKeyHeaderValues))
+            return await ValidateApiKeyAsync(apiKeyHeaderValues.ToString());
+
+        // Try Authorization header second
+        if (Request.Headers.TryGetValue("Authorization", out var authHeaderValues))
         {
-            // Try Authorization header with Bearer scheme
-            if (!Request.Headers.TryGetValue("Authorization", out var authHeaderValues))
-                return AuthenticateResult.NoResult();
-
             var authHeader = authHeaderValues.ToString();
-            if (!authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-                return AuthenticateResult.NoResult();
-
-            var potentialApiKey = authHeader.Substring("Bearer ".Length).Trim();
-
-            // Check if it looks like an API key (starts with our prefix)
-            if (!potentialApiKey.StartsWith("ffsk_", StringComparison.OrdinalIgnoreCase))
-                return AuthenticateResult.NoResult();
-
-            return await ValidateApiKeyAsync(potentialApiKey);
+            if (authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                var potentialApiKey = authHeader.Substring("Bearer ".Length).Trim();
+                if (potentialApiKey.StartsWith("ffsk_", StringComparison.OrdinalIgnoreCase))
+                    return await ValidateApiKeyAsync(potentialApiKey);
+            }
         }
 
-        var apiKey = apiKeyHeaderValues.ToString();
-        return await ValidateApiKeyAsync(apiKey);
+        // Try query string (common for SignalR/WebSockets)
+        // Optimization: Only check for query string on hub/websocket endpoints
+        if (Request.Path.StartsWithSegments("/api/hubs"))
+        {
+            if (Request.Query.TryGetValue("access_token", out var queryValues))
+            {
+                var potentialKey = queryValues.ToString();
+                if (potentialKey.StartsWith("ffsk_", StringComparison.OrdinalIgnoreCase))
+                    return await ValidateApiKeyAsync(potentialKey);
+            }
+        }
+        
+        return AuthenticateResult.NoResult();
     }
 
     private async Task<AuthenticateResult> ValidateApiKeyAsync(string apiKey)
@@ -78,28 +74,30 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
             var authCacheKey = $"auth:apikey:{apiKey}";
 
             var maybeTicket =
-                await _cache.TryGetAsync<AuthenticationTicket>(authCacheKey, AuthCacheOptions, Context.RequestAborted);
+                await cache.TryGetAsync<AuthenticationTicket>(authCacheKey, AuthCacheOptions, Context.RequestAborted);
             if (maybeTicket.HasValue)
             {
                 var cachedTicket = maybeTicket.Value!;
                 // Background update usage
-                if (cachedTicket.Principal.HasClaim(c => c.Type == "apiKeyId"))
-                {
-                    var idClaim = cachedTicket.Principal.FindFirst("apiKeyId")?.Value;
-                    if (Guid.TryParse(idClaim, out var apiKeyId))
-                        _ = _apiKeyUsageQueue.QueueApiKeyUsageAsync(apiKeyId, Context.RequestAborted);
-                }
+                if (!cachedTicket.Principal.HasClaim(c => c.Type == "apiKeyId"))
+                    return AuthenticateResult.Success(cachedTicket);
+                var idClaim = cachedTicket.Principal.FindFirst("apiKeyId")?.Value;
+                if (Guid.TryParse(idClaim, out var apiKeyId))
+                    apiKeyUsageQueue.TryQueue(apiKeyId);
 
                 return AuthenticateResult.Success(cachedTicket);
             }
 
             var keyHash = ApiKeyHasher.HashKey(apiKey);
-            var apiKeyEntity = await _apiKeyRepository.GetByKeyHashAsync(keyHash, Context.RequestAborted);
+            var apiKeyEntity = await apiKeyRepository.GetByKeyHashAsync(keyHash, Context.RequestAborted);
 
             if (apiKeyEntity == null)
             {
-                Logger.LogError("Invalid API key attempted");
-                return AuthenticateResult.Fail("Invalid API key");
+                // We return NoResult here instead of Fail to allow other authentication handlers 
+                // (like JwtBearer) to attempt authentication if this wasn't actually a valid API key.
+                // Logger.LogWarning("API key not found in database: {ApiKeyPrefix}...",
+                //     apiKey[..Math.Min(apiKey.Length, 10)]);
+                return AuthenticateResult.NoResult();
             }
 
             // Check expiration
@@ -110,7 +108,7 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
             }
 
             // Queue last-used update (handled by a hosted service with its own DI scope/DbContext).
-            _ = _apiKeyUsageQueue.QueueApiKeyUsageAsync(apiKeyEntity.Id, Context.RequestAborted);
+            apiKeyUsageQueue.TryQueue(apiKeyEntity.Id);
 
             // Build claims
             var claims = new List<Claim>
@@ -134,7 +132,7 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
 
             // Cache the successful authentication ticket for ~1 minute to avoid SHA256 and repository lookup
             // Note: We only use L1 (memory) cache here because AuthenticationTicket is not easily serializable for Redis.
-            await _cache.SetAsync(authCacheKey, ticket, AuthCacheOptions, Context.RequestAborted);
+            await cache.SetAsync(authCacheKey, ticket, AuthCacheOptions, Context.RequestAborted);
 
             return AuthenticateResult.Success(ticket);
         }

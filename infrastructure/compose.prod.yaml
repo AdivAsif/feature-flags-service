@@ -9,7 +9,7 @@
       - ASPNETCORE_URLS=http://+:8080
       - ConnectionStrings__FeatureFlagsDatabase=Host=postgres;Database=feature_flags_db;Username=postgres;Password=password
       - ConnectionStrings__FeatureFlagsCache=redis:6379
-      - JwtSecretKey=adivadivadivadivadivadivadivadiv
+      - JwtSecretKey=${JWT_SECRET_KEY:-adivadivadivadivadivadivadivadiv}
       - JwtIssuer=http://localhost:8080
       - JwtAudience=feature_flags_api
     ports:
@@ -87,7 +87,7 @@
     restart: unless-stopped
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - "grafana_data:/var/lib/grafana"
