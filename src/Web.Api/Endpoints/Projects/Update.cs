@@ -9,14 +9,12 @@ public class Update : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPut("/projects/{id:guid}",
-            async (Guid id, UpdateProjectRequest UpdateProjectRequest, IProjectService projectService,
+            async (Guid id, UpdateProjectRequest updateProjectRequest, IProjectService projectService,
                 ILogger<Update> logger) =>
             {
                 try
                 {
-                    logger.LogDebug("Updating project with id: {Id}", id);
-
-                    var updatedProject = await projectService.UpdateAsync(id, UpdateProjectRequest);
+                    var updatedProject = await projectService.UpdateAsync(id, updateProjectRequest);
 
                     return Results.Ok(updatedProject);
                 }

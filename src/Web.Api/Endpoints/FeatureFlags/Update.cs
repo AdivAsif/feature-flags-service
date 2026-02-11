@@ -25,10 +25,7 @@ public class Update : IEndpoint
                         logger.LogWarning("Request missing projectId claim");
                         return Results.Unauthorized();
                     }
-
-                    logger.LogDebug("Updating feature flag with key: {Key} for project: {ProjectId}", key,
-                        projectId);
-
+                    
                     // Get the current feature flag to validate ETag
                     var currentFeatureFlag = await featureFlagsService.GetByKeyAsync(projectId.Value, key);
                     if (currentFeatureFlag == null) return Results.NotFound($"Feature flag with key: {key} not found");

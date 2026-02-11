@@ -19,8 +19,7 @@ public class CachedApiKeyRepositoryTests
     {
         _innerRepository = Substitute.For<IApiKeyRepository>();
         _cache = Substitute.For<IFusionCache>();
-        var logger = Substitute.For<ILogger<ApiKeyUsageQueue>>();
-        var usageQueue = new ApiKeyUsageQueue(logger);
+        var usageQueue = new ApiKeyUsageQueue();
         _cachedApiKeyRepository = new CachedApiKeyRepository(_innerRepository, _cache, usageQueue);
     }
 

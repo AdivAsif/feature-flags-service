@@ -22,9 +22,6 @@ public class GetByKey : IEndpoint
                             logger.LogWarning("Request missing projectId claim");
                             return Results.Unauthorized();
                         }
-
-                        logger.LogDebug("Getting feature flag by key: {Key} for project: {ProjectId}", key,
-                            projectId);
                         var featureFlag = await featureFlagsService.GetByKeyAsync(projectId.Value, key);
 
                         if (featureFlag == null) return Results.NotFound($"Feature flag with key: {key} not found");

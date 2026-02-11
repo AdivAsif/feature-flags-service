@@ -11,8 +11,8 @@ public class ETagMiddleware(RequestDelegate next)
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // Avoid buffering/hashing for the hot-path evaluation endpoint.
-        // Evaluation responses are user-context dependent and typically not a good candidate for client-side ETags.
+        // Avoid buffering/hashing for the hot-path evaluation endpoint
+        // Evaluation responses are user-context dependent and don't need ETags, and buffering would add unnecessary overhead
         if (context.Request.Path.StartsWithSegments(EvaluationPathPrefix) || 
             context.Request.Path.StartsWithSegments(EvaluationV1PathPrefix))
         {

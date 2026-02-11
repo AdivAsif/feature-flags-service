@@ -142,7 +142,8 @@ public sealed class EvaluationService(IFeatureFlagRepository featureFlagReposito
     {
         // Optimized consistent hashing using XxHash32
         // Much faster than SHA256 while maintaining good distribution
-        // Use stackalloc to avoid string allocation for the combined key
+        // stackalloc to avoid string allocation for the combined key similar to group hashing
+        // This bucket implementation is similar to LaunchDarkly's, but simplified and optimized for this context
         var totalLen = flagKey.Length + 1 + userId.Length;
         uint hash;
         if (totalLen <= 256)
@@ -152,7 +153,6 @@ public sealed class EvaluationService(IFeatureFlagRepository featureFlagReposito
             charBuffer[flagKey.Length] = '.';
             userId.AsSpan().CopyTo(charBuffer[(flagKey.Length + 1)..]);
 
-            // XxHash32 needs bytes, so we need to encode
             Span<byte> byteBuffer = stackalloc byte[Encoding.UTF8.GetMaxByteCount(totalLen)];
             var bytesWritten = Encoding.UTF8.GetBytes(charBuffer, byteBuffer);
             hash = XxHash32.HashToUInt32(byteBuffer[..bytesWritten]);

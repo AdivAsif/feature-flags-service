@@ -13,8 +13,6 @@ public class AuditLogBackgroundService(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogDebug("Audit Log Background Service started");
-
         var channel = queue.GetChannel();
         await foreach (var auditLog in channel.Reader.ReadAllAsync(stoppingToken))
             try
@@ -22,14 +20,11 @@ public class AuditLogBackgroundService(
                 using var scope = serviceProvider.CreateScope();
                 var auditLogsService = scope.ServiceProvider.GetRequiredService<IAuditLogsService>();
                 await auditLogsService.AppendAsync(auditLog, stoppingToken);
-                logger.LogDebug("Processed audit log for FeatureFlagId: {FeatureFlagId}", auditLog.FeatureFlagId);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error processing audit log for FeatureFlagId: {FeatureFlagId}",
                     auditLog.FeatureFlagId);
             }
-
-        logger.LogDebug("Audit Log Background Service stopped");
     }
 }

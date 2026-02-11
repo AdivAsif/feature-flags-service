@@ -17,10 +17,9 @@ public static class CursorHelper
         var cursorData = Encoding.UTF8.GetString(bytes);
         var parts = cursorData.Split('|');
 
-        if (parts.Length != 2)
-            throw new ArgumentException("Invalid cursor format");
-
-        return (Guid.Parse(parts[0]), DateTimeOffset.Parse(parts[1]));
+        return parts.Length != 2
+            ? throw new ArgumentException("Invalid cursor format")
+            : (Guid.Parse(parts[0]), DateTimeOffset.Parse(parts[1]));
     }
 
     public static bool TryDecodeCursor(string? cursor, out Guid id, out DateTimeOffset createdAt)

@@ -2,9 +2,8 @@ using Domain;
 
 namespace Application.Interfaces.Repositories;
 
-/// <summary>
-///     Repository interface for Project operations.
-/// </summary>
+// Repository interface for Project persistence
+// Can be decorated with caching using Scrutor, implemented in the Infrastructure layer
 public interface IProjectRepository
 {
     Task<Project?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);

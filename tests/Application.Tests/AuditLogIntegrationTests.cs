@@ -194,7 +194,7 @@ public class AuditLogIntegrationTests
 
         // Start background service
         var cts = new CancellationTokenSource();
-        var executeTask = backgroundService.StartAsync(cts.Token);
+        await backgroundService.StartAsync(cts.Token);
 
         // Wait for processing
         await Task.Delay(200, cts.Token);

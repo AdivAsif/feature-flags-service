@@ -12,8 +12,6 @@ public class Revoke : IEndpoint
             {
                 try
                 {
-                    logger.LogDebug("Revoking API key: {KeyId} for project: {ProjectId}", keyId, projectId);
-
                     await apiKeyService.RevokeAsync(projectId, keyId);
 
                     return Results.NoContent();

@@ -12,8 +12,6 @@ public class Delete : IEndpoint
             {
                 try
                 {
-                    logger.LogDebug("Deleting project with id: {Id}", id);
-
                     await projectService.DeleteAsync(id);
 
                     return Results.NoContent();

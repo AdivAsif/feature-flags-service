@@ -5,14 +5,11 @@ using ZiggyCreatures.Caching.Fusion;
 
 namespace Infrastructure.Repositories;
 
-/// <summary>
-///     Cached decorator for ProjectRepository using FusionCache.
-///     Cache Strategy:
-///     - Local: 2 hours (projects change infrequently)
-///     - Distributed: 12 hours
-///     - Background operations enabled
-/// </summary>
-public class CachedProjectRepository(IProjectRepository innerRepository, IFusionCache cache) : IProjectRepository
+// Cached decorator for ProjectRepository using FusionCache, options are set to:
+// Local: 2 hours (projects change infrequently - could be marked inactive)
+// Distributed: 12 hours
+// Background operations enabled
+public sealed class CachedProjectRepository(IProjectRepository innerRepository, IFusionCache cache) : IProjectRepository
 {
     private static readonly FusionCacheEntryOptions CacheOptions = new()
     {
@@ -24,6 +21,7 @@ public class CachedProjectRepository(IProjectRepository innerRepository, IFusion
         Size = 1
     };
 
+    // GET
     public async Task<Project?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var cacheKey = CacheKeys.Project(id);
@@ -63,6 +61,7 @@ public class CachedProjectRepository(IProjectRepository innerRepository, IFusion
             cancellationToken);
     }
 
+    // CREATE
     public async Task<Project> CreateAsync(Project project, CancellationToken cancellationToken = default)
     {
         var created = await innerRepository.CreateAsync(project, cancellationToken);
@@ -74,6 +73,7 @@ public class CachedProjectRepository(IProjectRepository innerRepository, IFusion
         return created;
     }
 
+    // UPDATE
     public async Task<Project> UpdateAsync(Project project, CancellationToken cancellationToken = default)
     {
         var existing = await innerRepository.GetByIdAsync(project.Id, cancellationToken);
@@ -93,6 +93,7 @@ public class CachedProjectRepository(IProjectRepository innerRepository, IFusion
         return updated;
     }
 
+    // DELETE
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var existing = await innerRepository.GetByIdAsync(id, cancellationToken);

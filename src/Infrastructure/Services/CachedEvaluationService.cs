@@ -7,18 +7,15 @@ using ZiggyCreatures.Caching.Fusion;
 
 namespace Infrastructure.Services;
 
-/// <summary>
-///     Cached decorator for EvaluationService using FusionCache.
-///     Cache Strategy:
-///     - Local: 5 minutes (evaluations are hot path but need frequent updates)
-///     - Distributed: 30 minutes
-///     - Cache key includes flag version for automatic invalidation
-///     - Background operations enabled
-/// </summary>
+// Cached decorator for EvaluationService using FusionCache, options are set to:
+// Local: 5 minutes (evaluations are hot path but need frequent updates)
+// Distributed: 30 minutes
+// Cache key includes flag version for automatic invalidation
+// Background operations enabled
 public sealed class CachedEvaluationService(
     IEvaluationService innerService,
     IFusionCache cache,
-    IFeatureFlagRepository flagRepository) : IEvaluationService
+    IFeatureFlagRepository featureFlagRepository) : IEvaluationService
 {
     private static readonly FusionCacheEntryOptions CacheOptions = new()
     {
@@ -37,12 +34,11 @@ public sealed class CachedEvaluationService(
     public async Task<EvaluationResponse> EvaluateAsync(Guid projectId, string featureFlagKey,
         EvaluationContext context, CancellationToken cancellationToken = default)
     {
-        // Fetch flag to get version for cache key. 
-        // Note: flagRepository is decorated with CachedFeatureFlagRepository, 
-        // so this is a fast L1/L2 lookup.
-        var flag = await flagRepository.GetByKeyAsync(projectId, featureFlagKey, cancellationToken);
+        // Fetch flag to get a version for cache key
+        // FeatureFlagRepository is decorated with CachedFeatureFlagRepository, so this is a fast L1/L2 lookup
+        var flag = await featureFlagRepository.GetByKeyAsync(projectId, featureFlagKey, cancellationToken);
 
-        // If flag doesn't exist, no caching needed - return immediately
+        // If the feature flag doesn't exist, no caching needed, return immediately
         if (flag == null)
             return await innerService.EvaluateAsync(projectId, featureFlagKey, context, cancellationToken);
 
@@ -51,7 +47,7 @@ public sealed class CachedEvaluationService(
 
         return await cache.GetOrSetAsync(
             cacheKey,
-            // Optimization: Pass the already-fetched flag to avoid double DB lookup
+            // Pass the already-fetched flag to avoid double DB lookup
             async ct => await innerService.EvaluateAsync(flag, context, ct),
             CacheOptions,
             cancellationToken);
@@ -60,7 +56,7 @@ public sealed class CachedEvaluationService(
     public Task<EvaluationResponse> EvaluateAsync(Domain.FeatureFlag featureFlag, EvaluationContext context,
         CancellationToken cancellationToken = default)
     {
-        // Direct pass-through for the overload, though typically the cached path enters via key
+        // Method to avoid calling the flag twice because of decoration
         return innerService.EvaluateAsync(featureFlag, context, cancellationToken);
     }
 }

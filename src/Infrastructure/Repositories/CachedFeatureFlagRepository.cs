@@ -6,15 +6,12 @@ using ZiggyCreatures.Caching.Fusion;
 
 namespace Infrastructure.Repositories;
 
-/// <summary>
-///     Cached decorator for FeatureFlagsRepository using FusionCache.
-///     Cache Strategy:
-///     - Local: 10 minutes (flags change moderately)
-///     - Distributed: 1 hour
-///     - Eager refresh at 90% (proactive refresh before expiry)
-///     - Background operations enabled
-/// </summary>
-public class CachedFeatureFlagRepository(IFeatureFlagRepository innerRepository, IFusionCache cache)
+// Cached decorator for FeatureFlagsRepository using FusionCache, options are set to:
+// Local: 10 minutes (flags change moderately)
+// Distributed: 1 hour
+// Eager refresh at 90% (proactive refresh before expiry)
+// Background operations enabled
+public sealed class CachedFeatureFlagRepository(IFeatureFlagRepository innerRepository, IFusionCache cache)
     : IFeatureFlagRepository
 {
     private static readonly FusionCacheEntryOptions CacheOptions = new()
@@ -28,6 +25,7 @@ public class CachedFeatureFlagRepository(IFeatureFlagRepository innerRepository,
         Size = 1
     };
 
+    // GET
     public async Task<FeatureFlag?> GetByIdAsync(Guid projectId, Guid id, CancellationToken cancellationToken = default)
     {
         var cacheKey = CacheKeys.Flag(projectId, id);
@@ -57,6 +55,7 @@ public class CachedFeatureFlagRepository(IFeatureFlagRepository innerRepository,
         return innerRepository.GetPagedAsync(projectId, first, after, before, cancellationToken);
     }
 
+    // CREATE
     public async Task<FeatureFlag> CreateAsync(FeatureFlag featureFlag, CancellationToken cancellationToken = default)
     {
         var created = await innerRepository.CreateAsync(featureFlag, cancellationToken);
@@ -70,6 +69,7 @@ public class CachedFeatureFlagRepository(IFeatureFlagRepository innerRepository,
         return created;
     }
 
+    // UPDATE
     public async Task<FeatureFlag> UpdateAsync(FeatureFlag featureFlag, CancellationToken cancellationToken = default)
     {
         var updated = await innerRepository.UpdateAsync(featureFlag, cancellationToken);
@@ -83,6 +83,7 @@ public class CachedFeatureFlagRepository(IFeatureFlagRepository innerRepository,
         return updated;
     }
 
+    // DELETE
     public async Task DeleteAsync(Guid projectId, Guid id, CancellationToken cancellationToken = default)
     {
         var flag = await innerRepository.GetByIdAsync(projectId, id, cancellationToken);

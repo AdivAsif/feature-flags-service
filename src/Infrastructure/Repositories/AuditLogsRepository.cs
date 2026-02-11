@@ -16,6 +16,7 @@ public class AuditLogsRepository(IDbContextFactory<FeatureFlagsDbContext> contex
             cancellationToken);
     }
 
+    // Cursor-based pagination - refer to PAGINATION.md for details
     public Task<Slice<AuditLog>> GetPagedAsync(int first = 10, string? after = null,
         string? before = null, CancellationToken cancellationToken = default)
     {
@@ -87,7 +88,8 @@ public class AuditLogsRepository(IDbContextFactory<FeatureFlagsDbContext> contex
             .ExecuteDeleteAsync(cancellationToken), cancellationToken);
     }
 
-    // UPDATE - not needed
+    // UPDATE - not needed as Audit Logs are append-only, but implemented for completeness and potential future use
+    // cases (e.g., correcting performedByUserEmail if user changes their email)
     public Task<AuditLog> UpdateAsync(AuditLog auditLog, CancellationToken cancellationToken = default)
     {
         return ExecuteAsync(async db =>

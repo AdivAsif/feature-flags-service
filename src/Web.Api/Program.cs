@@ -34,10 +34,6 @@ using ZiggyCreatures.Caching.Fusion;
 using ZiggyCreatures.Caching.Fusion.Backplane.StackExchangeRedis;
 using ZiggyCreatures.Caching.Fusion.Serialization.SystemTextJson;
 
-// Clear default JWT claim type mappings to use short claim names
-JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
-JwtSecurityTokenHandler.DefaultOutboundClaimTypeMap.Clear();
-
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -141,9 +137,8 @@ builder.Services.AddMemoryCache(options =>
     // Configure L1 memory cache size for ~25,000 entries at peak
     // Assuming average entry size of ~2KB: 25,000 * 2KB = 50MB
     // Set to 100MB to provide headroom and prevent churning
-    options.SizeLimit = 50000; // ~100MB with 2KB entries
+    options.SizeLimit = 50000;
 
-    // Compact 25% when memory pressure detected
     options.CompactionPercentage = 0.25;
 });
 
@@ -227,28 +222,24 @@ builder.Services.AddAuthentication(options =>
 
 // Configure authorization policies
 builder.Services.AddAuthorizationBuilder()
-    // Configure authorization policies
     .SetDefaultPolicy(new AuthorizationPolicyBuilder()
         .AddAuthenticationSchemes(
             JwtBearerDefaults.AuthenticationScheme,
             ApiKeyAuthenticationOptions.DefaultScheme)
         .RequireAuthenticatedUser()
         .Build())
-    // Configure authorization policies
     .AddPolicy("Admin", policy =>
     {
         policy.AddAuthenticationSchemes(JwtBearerDefaults
             .AuthenticationScheme);
         policy.RequireRole("admin");
     })
-    // Configure authorization policies
     .AddPolicy("User", policy =>
     {
         policy.AddAuthenticationSchemes(JwtBearerDefaults
             .AuthenticationScheme);
         policy.RequireRole("user", "admin");
     })
-    // Configure authorization policies
     .AddPolicy("ReadAccess", policy =>
     {
         policy.AddAuthenticationSchemes(
@@ -266,7 +257,6 @@ builder.Services.AddAuthorizationBuilder()
             return hasReadScope || isUserOrAdmin;
         });
     })
-    // Configure authorization policies
     .AddPolicy("WriteAccess", policy =>
     {
         policy.AddAuthenticationSchemes(
@@ -284,7 +274,6 @@ builder.Services.AddAuthorizationBuilder()
             return hasWriteScope || isAdmin;
         });
     })
-    // Configure authorization policies
     .AddPolicy("DeleteAccess", policy =>
     {
         policy.AddAuthenticationSchemes(
@@ -302,7 +291,6 @@ builder.Services.AddAuthorizationBuilder()
             return hasDeleteScope || isAdmin;
         });
     })
-    // Configure authorization policies
     .AddPolicy("EvaluateAccess", policy =>
     {
         policy.AddAuthenticationSchemes(ApiKeyAuthenticationOptions.DefaultScheme);

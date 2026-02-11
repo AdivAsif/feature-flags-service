@@ -35,27 +35,20 @@ public class Evaluate : IEndpoint
                             UserId = userId ?? "anonymous",
                             Groups = groups is null ? [] : ParseGroups(groups)
                         };
-
-                        // logger.LogDebug(
-                        //     "Evaluating feature flag: {Key} for user: {UserId} in project: {ProjectId}",
-                        //     featureFlagKey, context.UserId, projectId);
-
+                        
                         var result = await evaluationService.EvaluateAsync(projectId.Value, featureFlagKey, context);
                         return Results.Json(result, ApiJsonContext.Default.EvaluationResponse);
                     }
                     catch (NotFoundException ex)
                     {
-                        // logger.LogError(ex, "Feature flag by key does not exist: {Key}", featureFlagKey);
                         return Results.NotFound(ex.Message);
                     }
                     catch (BadRequestException ex)
                     {
-                        // logger.LogError(ex, "An error occurred while evaluating feature flag by key: {Key}", featureFlagKey);
                         return Results.BadRequest(ex.Message);
                     }
                     catch (Exception ex)
                     {
-                        // logger.LogError(ex, "An error occurred while evaluating feature flag by key: {Key}", featureFlagKey);
                         return Results.Problem(statusCode: 500, detail: "An unexpected error occurred: " + ex.Message);
                     }
                 })
@@ -95,8 +88,7 @@ public class Evaluate : IEndpoint
             if (groupSpan.IsEmpty) continue;
             // Only allocate string here
             var group = groupSpan.ToString().ToUpperInvariant();
-                
-            // Simple distinct check for small lists is faster than HashSet
+            
             if (!result.Contains(group))
                 result.Add(group);
         }

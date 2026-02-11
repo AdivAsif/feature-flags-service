@@ -6,14 +6,11 @@ using ZiggyCreatures.Caching.Fusion;
 
 namespace Infrastructure.Repositories;
 
-/// <summary>
-///     Cached decorator for ApiKeyRepository using FusionCache.
-///     Cache Strategy:
-///     - Local: 4 hours (API keys rarely change)
-///     - Distributed: 24 hours
-///     - Background operations enabled for write-through caching
-/// </summary>
-public class CachedApiKeyRepository(IApiKeyRepository innerRepository, IFusionCache cache, ApiKeyUsageQueue usageQueue)
+// Cached decorator for ApiKeyRepository using FusionCache, options are set to:
+// Local: 4 hours (API keys rarely change)
+// Distributed: 24 hours
+// Background operations enabled for write-through caching
+public sealed class CachedApiKeyRepository(IApiKeyRepository innerRepository, IFusionCache cache, ApiKeyUsageQueue usageQueue)
     : IApiKeyRepository
 {
     private static readonly FusionCacheEntryOptions CacheOptions = new()
@@ -26,6 +23,7 @@ public class CachedApiKeyRepository(IApiKeyRepository innerRepository, IFusionCa
         Size = 1
     };
 
+    // GET
     public async Task<ApiKey?> GetByIdAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
     {
         var cacheKey = CacheKeys.ApiKeyById(apiKeyId);
@@ -36,11 +34,9 @@ public class CachedApiKeyRepository(IApiKeyRepository innerRepository, IFusionCa
             CacheOptions,
             cancellationToken);
     }
-
-    /// <summary>
-    ///     Get API key by hash with caching.
-    ///     This is the HOT PATH for authentication - called on every request.
-    /// </summary>
+    
+    // Get API key by hash with caching
+    // This is the hot path for authentication - called on pretty much every request
     public async Task<ApiKey?> GetByKeyHashAsync(string keyHash, CancellationToken cancellationToken = default)
     {
         var cacheKey = CacheKeys.ApiKey(keyHash);
@@ -70,6 +66,7 @@ public class CachedApiKeyRepository(IApiKeyRepository innerRepository, IFusionCa
             cancellationToken);
     }
 
+    // CREATE
     public async Task<ApiKey> CreateAsync(ApiKey apiKey, CancellationToken cancellationToken = default)
     {
         var createdKey = await innerRepository.CreateAsync(apiKey, cancellationToken);
@@ -84,6 +81,7 @@ public class CachedApiKeyRepository(IApiKeyRepository innerRepository, IFusionCa
         return createdKey;
     }
 
+    // UPDATE (soft-delete)
     public async Task RevokeAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
     {
         var apiKey = await innerRepository.GetByIdAsync(apiKeyId, cancellationToken);
@@ -96,18 +94,11 @@ public class CachedApiKeyRepository(IApiKeyRepository innerRepository, IFusionCa
             await cache.RemoveAsync(CacheKeys.ApiKeysByProject(apiKey.ProjectId), token: cancellationToken);
         }
     }
-    
+
+    // Background worker update
     public Task UpdateLastUsedAtAsync(Guid apiKeyId, CancellationToken _ = default)
     {
         usageQueue.TryQueue(apiKeyId);
         return Task.CompletedTask;
     }
-
-    // public Task UpdateLastUsedAtAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
-    // {
-    //     // Queue for background processing instead of blocking the request
-    //     // The background service will throttle updates to once per hour per key
-    //     _ = usageQueue.QueueApiKeyUsageAsync(apiKeyId, cancellationToken);
-    //     return Task.CompletedTask;
-    // }
 }

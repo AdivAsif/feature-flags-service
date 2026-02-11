@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
 
-public class ApiKeyRepository(IDbContextFactory<FeatureFlagsDbContext> contextFactory)
+public sealed class ApiKeyRepository(IDbContextFactory<FeatureFlagsDbContext> contextFactory)
     : BaseRepository<FeatureFlagsDbContext>(contextFactory), IApiKeyRepository
 {
     // GET

@@ -11,6 +11,34 @@ namespace Infrastructure.Services;
 public sealed class ApiKeyService(IApiKeyRepository apiKeyRepository, IProjectRepository projectRepository)
     : IApiKeyService
 {
+    // GET
+    public async Task<IEnumerable<ApiKeyResponse>> GetByProjectIdAsync(Guid projectId,
+        CancellationToken cancellationToken = default)
+    {
+        var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
+        if (project == null)
+            throw new NotFoundException($"Project with id: {projectId} not found");
+
+        var apiKeys = await apiKeyRepository.GetByProjectIdAsync(projectId, cancellationToken);
+
+        return apiKeys.Select(k => new ApiKeyResponse
+        {
+            Id = k.Id,
+            ProjectId = k.ProjectId,
+            KeyPrefix = k.KeyPrefix, // Only return prefix for security
+            Name = k.Name,
+            Scopes = k.Scopes,
+            ExpiresAt = k.ExpiresAt,
+            LastUsedAt = k.LastUsedAt,
+            CreatedByUserId = k.CreatedByUserId,
+            RevokedAt = k.RevokedAt,
+            IsActive = k.IsActive,
+            CreatedAt = k.CreatedAt,
+            UpdatedAt = k.UpdatedAt
+        });
+    }
+    
+    // CREATE
     public async Task<ApiKeyCreatedResponse> CreateAsync(Guid projectId, CreateApiKeyRequest dto,
         string createdByUserId,
         CancellationToken cancellationToken = default)
@@ -55,39 +83,13 @@ public sealed class ApiKeyService(IApiKeyRepository apiKeyRepository, IProjectRe
         );
     }
 
-    public async Task<IEnumerable<ApiKeyResponse>> GetByProjectIdAsync(Guid projectId,
-        CancellationToken cancellationToken = default)
-    {
-        var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
-        if (project == null)
-            throw new NotFoundException($"Project with id: {projectId} not found");
-
-        var apiKeys = await apiKeyRepository.GetByProjectIdAsync(projectId, cancellationToken);
-
-        return apiKeys.Select(k => new ApiKeyResponse
-        {
-            Id = k.Id,
-            ProjectId = k.ProjectId,
-            KeyPrefix = k.KeyPrefix, // Only return prefix for security
-            Name = k.Name,
-            Scopes = k.Scopes,
-            ExpiresAt = k.ExpiresAt,
-            LastUsedAt = k.LastUsedAt,
-            CreatedByUserId = k.CreatedByUserId,
-            RevokedAt = k.RevokedAt,
-            IsActive = k.IsActive,
-            CreatedAt = k.CreatedAt,
-            UpdatedAt = k.UpdatedAt
-        });
-    }
-
+    // UPDATE (soft delete)
     public async Task RevokeAsync(Guid projectId, Guid apiKeyId, CancellationToken cancellationToken = default)
     {
         var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
         if (project == null)
             throw new NotFoundException($"Project with id: {projectId} not found");
 
-        // Note: We could add validation here to ensure the API key belongs to the project
         await apiKeyRepository.RevokeAsync(apiKeyId, cancellationToken);
     }
 }

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace Infrastructure.Data;
 
+// Optional seeding of the database with default data for easier understanding of the project
 public class DbSeeder(IDbContextFactory<FeatureFlagsDbContext> factory, IConfiguration configuration)
 {
     public async Task SeedAsync(CancellationToken cancellationToken = default)
@@ -13,45 +14,32 @@ public class DbSeeder(IDbContextFactory<FeatureFlagsDbContext> factory, IConfigu
 
         var seedingEnabled = configuration.GetValue("DatabaseSeeding:Enabled", true);
         if (!seedingEnabled)
-        {
-            Console.WriteLine("✓ Database seeding is disabled in configuration");
             return;
-        }
 
-        // Check if any projects exist
+        // Check if any projects exist - if they do, don't seed to avoid conflicts with existing data
         if (await context.Projects.AnyAsync(cancellationToken))
-        {
-            Console.WriteLine("✓ Database already seeded, skipping...");
             return;
-        }
-
-        Console.WriteLine("→ Seeding database with default data...");
 
         var createDefaultProject = configuration.GetValue("DatabaseSeeding:CreateDefaultProject", true);
         var createSampleApiKeys = configuration.GetValue("DatabaseSeeding:CreateSampleApiKeys", true);
         var createSampleFlags = configuration.GetValue("DatabaseSeeding:CreateSampleFlags", true);
 
+        // If explicitly set to false, don't seed
         if (!createDefaultProject)
-        {
-            Console.WriteLine("✓ Default project creation disabled in configuration");
             return;
-        }
 
         // Create default project
         var defaultProject = new Project
         {
             Id = Guid.NewGuid(),
             Name = "Default Project",
-            Description = "Default project for getting started with feature flags",
+            Description = "Default project for getting started with feature flags and testing",
             IsActive = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
         await context.Projects.AddAsync(defaultProject, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
-
-        Console.WriteLine($"  ✓ Created default project: {defaultProject.Name} (ID: {defaultProject.Id})");
 
         // Create default API keys for the project
         if (createSampleApiKeys)
@@ -87,17 +75,16 @@ public class DbSeeder(IDbContextFactory<FeatureFlagsDbContext> factory, IConfigu
                     Name = keyConfig.Name,
                     Scopes = keyConfig.Scopes,
                     ExpiresAt = null,
-                    CreatedByUserId = "system",
+                    CreatedByUserId = "seeder",
                     IsActive = true,
-                    CreatedAt = DateTimeOffset.UtcNow,
-                    UpdatedAt = DateTimeOffset.UtcNow
+                    CreatedAt = DateTimeOffset.UtcNow
                 };
 
                 await context.ApiKeys.AddAsync(apiKeyEntity, cancellationToken);
 
-                Console.WriteLine($"  ✓ Created API key: {keyConfig.Name}");
-                Console.WriteLine($"    Key: {apiKey}");
-                Console.WriteLine($"    Scopes: {keyConfig.Scopes}");
+                Console.WriteLine($"Created API key: {keyConfig.Name}");
+                Console.WriteLine($"Key: {apiKey}");
+                Console.WriteLine($"Scopes: {keyConfig.Scopes}");
             }
 
             await context.SaveChangesAsync(cancellationToken);
@@ -112,13 +99,12 @@ public class DbSeeder(IDbContextFactory<FeatureFlagsDbContext> factory, IConfigu
                 {
                     Id = Guid.NewGuid(),
                     ProjectId = defaultProject.Id,
-                    Key = "welcome-banner",
-                    Description = "Display welcome banner for new users",
+                    Key = "new-dashboard",
+                    Description = "Enable the new dashboard design for users",
                     Enabled = true,
                     Version = 1,
-                    Parameters = [new FeatureFlagParameters { RuleType = 0, RuleValue = "50" }],
-                    CreatedAt = DateTimeOffset.UtcNow,
-                    UpdatedAt = DateTimeOffset.UtcNow
+                    Parameters = [new FeatureFlagParameters { RuleType = 0, RuleValue = "50" }], // 50% rollout
+                    CreatedAt = DateTimeOffset.UtcNow
                 },
                 new FeatureFlag
                 {
@@ -128,9 +114,11 @@ public class DbSeeder(IDbContextFactory<FeatureFlagsDbContext> factory, IConfigu
                     Description = "Enable dark mode UI theme",
                     Enabled = false,
                     Version = 1,
-                    Parameters = [new FeatureFlagParameters { RuleType = RuleType.Group, RuleValue = "beta" }],
-                    CreatedAt = DateTimeOffset.UtcNow,
-                    UpdatedAt = DateTimeOffset.UtcNow
+                    Parameters =
+                    [
+                        new FeatureFlagParameters { RuleType = RuleType.Group, RuleValue = "beta" }
+                    ], // Enabled for users in the 'beta' group
+                    CreatedAt = DateTimeOffset.UtcNow
                 },
                 new FeatureFlag
                 {
@@ -140,26 +128,21 @@ public class DbSeeder(IDbContextFactory<FeatureFlagsDbContext> factory, IConfigu
                     Description = "Enable access to beta features",
                     Enabled = false,
                     Version = 1,
-                    Parameters = [new FeatureFlagParameters { RuleType = RuleType.User, RuleValue = "user1" }],
-                    CreatedAt = DateTimeOffset.UtcNow,
-                    UpdatedAt = DateTimeOffset.UtcNow
+                    Parameters =
+                    [
+                        new FeatureFlagParameters { RuleType = RuleType.User, RuleValue = "user1" }
+                    ], // Enabled for a specific user ID - "user1"
+                    CreatedAt = DateTimeOffset.UtcNow
                 }
             };
 
             await context.FeatureFlags.AddRangeAsync(sampleFlags, cancellationToken);
             await context.SaveChangesAsync(cancellationToken);
-
-            Console.WriteLine($"  ✓ Created {sampleFlags.Length} sample feature flags");
         }
 
-        Console.WriteLine("✓ Database seeding completed successfully!");
+        Console.WriteLine("Database seeding completed successfully.");
 
         if (createSampleApiKeys)
-        {
-            Console.WriteLine();
-            Console.WriteLine("=".PadRight(80, '='));
-            Console.WriteLine("IMPORTANT: Save the API keys above - they won't be shown again!");
-            Console.WriteLine("=".PadRight(80, '='));
-        }
+            Console.WriteLine("Copy the API keys above to test, they cannot be retrieved again in its full length.");
     }
 }

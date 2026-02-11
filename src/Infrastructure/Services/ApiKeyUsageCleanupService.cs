@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Services;
 
+// Every 10 minutes, clean up API key usage entries to prevent unbounded growth of the queue
 public sealed class ApiKeyUsageCleanupService(
     ApiKeyUsageQueue queue,
     ILogger<ApiKeyUsageCleanupService> logger)
@@ -12,8 +13,6 @@ public sealed class ApiKeyUsageCleanupService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogDebug("API Key usage cleanup service started");
-
         using var timer = new PeriodicTimer(CleanupInterval);
 
         while (await timer.WaitForNextTickAsync(stoppingToken))

@@ -5,15 +5,8 @@ using Microsoft.AspNetCore.SignalR;
 namespace Web.Api.Hubs;
 
 [Authorize]
-public class FeatureFlagHub : Hub
+public class FeatureFlagHub(ILogger<FeatureFlagHub> logger) : Hub
 {
-    private readonly ILogger<FeatureFlagHub> _logger;
-
-    public FeatureFlagHub(ILogger<FeatureFlagHub> logger)
-    {
-        _logger = logger;
-    }
-
     public async Task SubscribeToProject(Guid? projectId = null)
     {
         var finalProjectId = projectId;
@@ -28,12 +21,12 @@ public class FeatureFlagHub : Hub
                     finalProjectId = parsedId;
                 else
                     // If we are authenticated but missing the claim, it might be a different user type or configuration issue
-                    _logger.LogWarning("Authenticated user {UserIdentifier} missing projectId claim",
+                    logger.LogWarning("Authenticated user {UserIdentifier} missing projectId claim",
                         user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown");
             }
             else
             {
-                _logger.LogWarning("Unauthenticated user {ConnectionId} attempting to subscribe to project",
+                logger.LogWarning("Unauthenticated user {ConnectionId} attempting to subscribe to project",
                     Context.ConnectionId);
             }
         }
@@ -42,12 +35,10 @@ public class FeatureFlagHub : Hub
         {
             var groupId = finalProjectId.Value.ToString();
             await Groups.AddToGroupAsync(Context.ConnectionId, groupId);
-            _logger.LogInformation("Client {ConnectionId} subscribed to project {ProjectId}", Context.ConnectionId,
-                groupId);
         }
         else
         {
-            _logger.LogWarning("Subscription failed for client {ConnectionId}: No project ID found",
+            logger.LogWarning("Subscription failed for client {ConnectionId}: No project ID found",
                 Context.ConnectionId);
             await Clients.Caller.SendAsync("SubscriptionFailed", "No project ID found in request or claims.");
         }
@@ -55,14 +46,14 @@ public class FeatureFlagHub : Hub
 
     public override async Task OnConnectedAsync()
     {
-        // Try to auto-subscribe on connection if possible
         try
         {
             await SubscribeToProject();
         }
         catch (Exception ex)
         {
-            // Log or handle error if needed
+            logger.LogError(ex, "Error during OnConnectedAsync for connection {ConnectionId}", Context.ConnectionId);
+             await Clients.Caller.SendAsync("SubscriptionFailed", "An error occurred while subscribing to project updates.");
         }
 
         await base.OnConnectedAsync();

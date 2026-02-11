@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
 
-public class ProjectRepository(IDbContextFactory<FeatureFlagsDbContext> contextFactory)
+public sealed class ProjectRepository(IDbContextFactory<FeatureFlagsDbContext> contextFactory)
     : BaseRepository<FeatureFlagsDbContext>(contextFactory), IProjectRepository
 {
     // GET

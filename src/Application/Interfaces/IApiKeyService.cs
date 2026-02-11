@@ -5,11 +5,11 @@ namespace Application.Interfaces;
 
 public interface IApiKeyService
 {
-    Task<ApiKeyCreatedResponse> CreateAsync(Guid projectId, CreateApiKeyRequest dto, string createdByUserId,
-        CancellationToken cancellationToken = default);
-
     Task<IEnumerable<ApiKeyResponse>>
         GetByProjectIdAsync(Guid projectId, CancellationToken cancellationToken = default);
+
+    Task<ApiKeyCreatedResponse> CreateAsync(Guid projectId, CreateApiKeyRequest dto, string createdByUserId,
+        CancellationToken cancellationToken = default);
 
     Task RevokeAsync(Guid projectId, Guid apiKeyId, CancellationToken cancellationToken = default);
 }

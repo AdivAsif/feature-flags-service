@@ -3,9 +3,8 @@ using Domain;
 
 namespace Application.Interfaces.Repositories;
 
-/// <summary>
-///     Repository interface for FeatureFlag operations.
-/// </summary>
+// Repository interface for FeatureFlag persistence
+// Can be decorated with caching using Scrutor, implemented in the Infrastructure layer
 public interface IFeatureFlagRepository
 {
     Task<FeatureFlag?> GetByIdAsync(Guid projectId, Guid id, CancellationToken cancellationToken = default);

@@ -48,7 +48,7 @@ public class AuditLogBackgroundServiceTests
         await queue.QueueAuditLogAsync(auditLog);
 
         var cts = new CancellationTokenSource();
-        var executeTask = backgroundService.StartAsync(cts.Token);
+        await backgroundService.StartAsync(cts.Token);
 
         // Give it a moment to process
         await Task.Delay(100, cts.Token);

@@ -24,9 +24,7 @@ public class Create : IEndpoint
                             logger.LogWarning("Request missing projectId claim");
                             return Results.Unauthorized();
                         }
-
-                        logger.LogDebug("Creating feature flag with key: {Key} for project: {ProjectId}",
-                            featureFlag.Key, projectId);
+                        
                         var performedByUserId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ??
                                                 httpContext.User.FindFirstValue("sub");
                         var performedByUserEmail = httpContext.User.FindFirstValue(ClaimTypes.Email) ??

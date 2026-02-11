@@ -14,12 +14,7 @@ public class GetAll : IEndpoint
                 string? after = null,
                 string? before = null) =>
             {
-                logger.LogDebug(
-                    "Getting audit logs with cursor pagination (first: {First}, after: {After}, before: {Before})",
-                    first, after ?? "null", before ?? "null");
-
                 var slice = await auditLogsService.GetPagedAsync(first, after, before);
-
                 return Results.Ok(slice.ToPagedResult());
             })
             .WithName("GetAllAuditLogs")

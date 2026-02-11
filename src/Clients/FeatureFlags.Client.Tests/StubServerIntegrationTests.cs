@@ -12,6 +12,7 @@ public sealed class StubServerIntegrationTests
     [Fact]
     public async Task EvaluateAsync_WorksAgainstStubServer_EndToEnd()
     {
+        // Arrange
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
 
@@ -36,9 +37,13 @@ public sealed class StubServerIntegrationTests
             ApiKey = "ffsk_123"
         });
 
+        // Act
         var on = await sdk.EvaluateAsync("always-on", new EvaluationContext { UserId = "u1" });
+
+        // Assert
         Assert.True(on.Allowed);
 
+        // Act & Assert (Error case)
         var ex = await Assert.ThrowsAsync<FeatureFlagsApiException>(() => sdk.EvaluateAsync("missing-flag"));
         Assert.Equal(HttpStatusCode.NotFound, ex.StatusCode);
 

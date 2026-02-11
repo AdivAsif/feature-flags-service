@@ -2,10 +2,11 @@ using System.Security.Cryptography;
 
 namespace Infrastructure.Authentication;
 
-public class ApiKeyGenerator
+public static class ApiKeyGenerator
 {
     private const int KeyLength = 32;
 
+    // Basic generator for API Keys, ffsk because feature flags service key, live for production
     public static string GenerateKey(string prefix = "ffsk_live_")
     {
         var randomBytes = new byte[KeyLength];
@@ -17,8 +18,7 @@ public class ApiKeyGenerator
         var base64 = Convert.ToBase64String(randomBytes)
             .Replace("+", "")
             .Replace("/", "")
-            .Replace("=", "")
-            .Substring(0, 32);
+            .Replace("=", "")[..32];
 
         return $"{prefix}{base64}";
     }
@@ -26,6 +26,6 @@ public class ApiKeyGenerator
     public static string ExtractPrefix(string apiKey)
     {
         var prefixEndIndex = apiKey.LastIndexOf('_');
-        return prefixEndIndex > 0 ? apiKey.Substring(0, prefixEndIndex + 1) : string.Empty;
+        return prefixEndIndex > 0 ? apiKey[..(prefixEndIndex + 1)] : string.Empty;
     }
 }

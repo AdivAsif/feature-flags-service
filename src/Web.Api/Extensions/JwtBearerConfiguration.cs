@@ -21,7 +21,7 @@ public static class JwtBearerConfiguration
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["JwtSecretKey"])),
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["JwtSecretKey"] ?? string.Empty)),
                     ValidateLifetime = true,
                     ValidateIssuer = false,
                     ValidateAudience = false,
@@ -39,7 +39,7 @@ public static class JwtBearerConfiguration
                 ValidateIssuer = true,
                 ValidateAudience = true,
                 ValidateLifetime = true,
-                // Map the Auth0 role claim if you used a namespace
+                // Map the Auth0 role claim if using a namespace
                 RoleClaimType = configuration["Auth:RoleClaimType"] ?? "role"
             };
 
@@ -50,7 +50,7 @@ public static class JwtBearerConfiguration
                 {
                     var accessToken = context.Request.Query["access_token"];
 
-                    // If the request is for our hub...
+                    // If the request is for the hub
                     var path = context.HttpContext.Request.Path;
                     if (!string.IsNullOrEmpty(accessToken) &&
                         path.StartsWithSegments("/api/hubs/feature-flags"))

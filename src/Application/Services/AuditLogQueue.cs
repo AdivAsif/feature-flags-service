@@ -21,13 +21,8 @@ public class AuditLogQueue(ILogger<AuditLogQueue> logger)
     public async ValueTask QueueAuditLogAsync(AuditLogResponse auditLog, CancellationToken cancellationToken = default)
     {
         if (await _channel.Writer.WaitToWriteAsync(cancellationToken))
-        {
             _channel.Writer.TryWrite(auditLog);
-            logger.LogDebug("Audit log queued for FeatureFlagId: {FeatureFlagId}", auditLog.FeatureFlagId);
-        }
         else
-        {
             logger.LogWarning("Failed to queue audit log for FeatureFlagId: {FeatureFlagId}", auditLog.FeatureFlagId);
-        }
     }
 }

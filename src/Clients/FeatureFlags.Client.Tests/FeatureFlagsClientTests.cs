@@ -13,6 +13,7 @@ public sealed class FeatureFlagsClientTests
     [Fact]
     public async Task EvaluateAsync_UsesBearerAuth_WhenApiKeyLooksLikeApiKey()
     {
+        // Arrange
         HttpRequestMessage? captured = null;
 
         var handler = new RecordingHandler((req, _) =>
@@ -30,8 +31,10 @@ public sealed class FeatureFlagsClientTests
             ApiKey = "ffsk_123" // As long as the prefix looks like an API key's would, it knows it is present
         });
 
+        // Act
         _ = await client.EvaluateAsync("my-flag");
 
+        // Assert
         Assert.NotNull(captured);
         Assert.Equal("Bearer", captured!.Headers.Authorization?.Scheme);
         Assert.Equal("ffsk_123", captured.Headers.Authorization?.Parameter);
@@ -41,6 +44,7 @@ public sealed class FeatureFlagsClientTests
     [Fact]
     public async Task EvaluateAsync_UsesHeaderAuth_WhenApiKeyIsArbitrary()
     {
+        // Arrange
         HttpRequestMessage? captured = null;
 
         var handler = new RecordingHandler((req, _) =>
@@ -59,8 +63,10 @@ public sealed class FeatureFlagsClientTests
             ApiKeyHeaderName = "X-Api-Key"
         });
 
+        // Act
         _ = await client.EvaluateAsync("my-flag");
 
+        // Assert
         Assert.NotNull(captured);
         Assert.Null(captured!.Headers.Authorization);
         Assert.True(captured.Headers.TryGetValues("X-Api-Key", out var values));
@@ -70,6 +76,7 @@ public sealed class FeatureFlagsClientTests
     [Fact]
     public async Task EvaluateAsync_AddsApiVersionQuery_WhenConfigured()
     {
+        // Arrange
         Uri? capturedUri = null;
 
         var handler = new RecordingHandler((req, _) =>
@@ -88,8 +95,10 @@ public sealed class FeatureFlagsClientTests
             ApiVersion = new Version(1, 0)
         });
 
+        // Act
         _ = await client.EvaluateAsync("my-flag");
 
+        // Assert
         Assert.NotNull(capturedUri);
         Assert.Contains("api-version=1.0", capturedUri!.Query);
     }
@@ -97,6 +106,7 @@ public sealed class FeatureFlagsClientTests
     [Fact]
     public async Task EvaluateAsync_HasContextQueryParameters()
     {
+        // Arrange
         Uri? capturedUri = null;
 
         var handler = new RecordingHandler((req, _) =>
@@ -114,6 +124,7 @@ public sealed class FeatureFlagsClientTests
             ApiKey = "ffsk_123"
         });
 
+        // Act
         _ = await client.EvaluateAsync("my-flag", new EvaluationContext
         {
             UserId = "u1",
@@ -122,6 +133,7 @@ public sealed class FeatureFlagsClientTests
             // Environment = "dev"
         });
 
+        // Assert
         Assert.NotNull(capturedUri);
         var query = capturedUri!.Query;
         Assert.Contains("userId=u1", query);
@@ -134,6 +146,7 @@ public sealed class FeatureFlagsClientTests
     [Fact]
     public async Task EvaluateAsync_ThrowsFeatureFlagsApiException_OnUnauthorized()
     {
+        // Arrange
         var handler = new RecordingHandler((_, _) => Task.FromResult(
             new HttpResponseMessage(HttpStatusCode.Unauthorized)
             {
@@ -146,6 +159,7 @@ public sealed class FeatureFlagsClientTests
             ApiKey = "ffsk_123"
         });
 
+        // Act & Assert
         var ex = await Assert.ThrowsAsync<FeatureFlagsApiException>(() => client.EvaluateAsync("my-flag"));
         Assert.Equal(HttpStatusCode.Unauthorized, ex.StatusCode);
         Assert.Equal("unauthorized", ex.ResponseBody);
@@ -154,6 +168,7 @@ public sealed class FeatureFlagsClientTests
     [Fact]
     public async Task EvaluateAsync_ParsesProblemDetails_WhenReturned()
     {
+        // Arrange
         var handler = new RecordingHandler((_, _) =>
         {
             var response = new HttpResponseMessage(HttpStatusCode.BadRequest)
@@ -172,6 +187,7 @@ public sealed class FeatureFlagsClientTests
             ApiKey = "ffsk_123"
         });
 
+        // Act & Assert
         var ex = await Assert.ThrowsAsync<FeatureFlagsApiException>(() => client.EvaluateAsync("my-flag"));
         Assert.Equal(HttpStatusCode.BadRequest, ex.StatusCode);
         Assert.NotNull(ex.ProblemDetails);
@@ -182,6 +198,7 @@ public sealed class FeatureFlagsClientTests
     [Fact]
     public async Task EvaluateAsync_AddsDefaultHeaders_AndPerRequestHeaders()
     {
+        // Arrange
         HttpRequestMessage? captured = null;
 
         var handler = new RecordingHandler((req, _) =>
@@ -211,8 +228,10 @@ public sealed class FeatureFlagsClientTests
             }
         };
 
+        // Act
         _ = await client.EvaluateAsync("my-flag", requestOptions: requestOptions);
 
+        // Assert
         Assert.NotNull(captured);
         Assert.True(captured!.Headers.TryGetValues("X-Correlation-Id", out var correlation));
         Assert.Equal("c1", correlation.Single());
@@ -224,6 +243,7 @@ public sealed class FeatureFlagsClientTests
     [Fact]
     public async Task EvaluateAsync_CachesResult_WhenEnabled()
     {
+        // Arrange
         var calls = 0;
         var handler = new RecordingHandler((_, _) =>
         {
@@ -244,15 +264,18 @@ public sealed class FeatureFlagsClientTests
 
         var context = new EvaluationContext { UserId = "u1" };
 
+        // Act
         _ = await client.EvaluateAsync("my-flag", context);
         _ = await client.EvaluateAsync("my-flag", context);
 
+        // Assert
         Assert.Equal(1, calls);
     }
 
     [Fact]
     public async Task IsEnabledAsync_ReturnsDefaultValue_OnNotFound()
     {
+        // Arrange
         var handler = new RecordingHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
         {
             Content = new StringContent("missing", Encoding.UTF8, "text/plain")
@@ -264,13 +287,17 @@ public sealed class FeatureFlagsClientTests
             ApiKey = "ffsk_123"
         });
 
+        // Act
         var enabled = await client.IsEnabledAsync("missing-flag", defaultValue: true);
+
+        // Assert
         Assert.True(enabled);
     }
 
     [Fact]
     public async Task DependencyInjection_RegistersClient()
     {
+        // Arrange
         var services = new ServiceCollection();
 
         services.AddFeatureFlagsClient(options =>
@@ -280,14 +307,18 @@ public sealed class FeatureFlagsClientTests
             options.ApiVersion = new Version(1, 0);
         });
 
+        // Act
         await using var provider = services.BuildServiceProvider();
         var client = provider.GetRequiredService<IFeatureFlagsClient>();
+
+        // Assert
         Assert.NotNull(client);
     }
 
     [Fact]
     public async Task DependencyInjection_BindsFromConfiguration()
     {
+        // Arrange
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -301,8 +332,11 @@ public sealed class FeatureFlagsClientTests
         var services = new ServiceCollection();
         services.AddFeatureFlagsClient(configuration);
 
+        // Act
         await using var provider = services.BuildServiceProvider();
         var options = provider.GetRequiredService<FeatureFlagsClientOptions>();
+
+        // Assert
         Assert.Equal(new Uri("https://example.test/api/"), options.BaseAddress);
         Assert.Equal("ffsk_123", options.ApiKey);
         Assert.Equal(new Version(1, 0), options.ApiVersion);
@@ -312,6 +346,7 @@ public sealed class FeatureFlagsClientTests
     [Fact]
     public async Task DependencyInjection_RetriesTransientFailures_WhenEnabled()
     {
+        // Arrange
         var calls = 0;
         var handler = new RecordingHandler((_, _) =>
         {
@@ -346,8 +381,10 @@ public sealed class FeatureFlagsClientTests
         await using var provider = services.BuildServiceProvider();
         var client = provider.GetRequiredService<IFeatureFlagsClient>();
 
+        // Act
         _ = await client.EvaluateAsync("my-flag");
 
+        // Assert
         Assert.Equal(2, calls);
     }
 

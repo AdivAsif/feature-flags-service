@@ -78,6 +78,8 @@ public sealed class FeatureFlagsService(
             PerformedByUserId = performedByUserId ?? string.Empty,
             PerformedByUserEmail = performedByUserEmail ?? string.Empty
         };
+        // Queue the audit log asynchronously without awaiting to avoid delaying the API response, similar 
+        // implementation to the API key LastUsedAt update
         _ = auditLogQueue.QueueAuditLogAsync(auditLog, cancellationToken);
 
         return mapper.FeatureFlagToResponse(created);

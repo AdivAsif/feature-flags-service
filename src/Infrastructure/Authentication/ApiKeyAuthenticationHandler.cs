@@ -51,18 +51,13 @@ public class ApiKeyAuthenticationHandler(
             }
         }
 
-        // Try query string (common for SignalR/WebSockets)
-        // Optimization: Only check for query string on hub/websocket endpoints
-        if (Request.Path.StartsWithSegments("/api/hubs"))
-        {
-            if (Request.Query.TryGetValue("access_token", out var queryValues))
-            {
-                var potentialKey = queryValues.ToString();
-                if (potentialKey.StartsWith("ffsk_", StringComparison.OrdinalIgnoreCase))
-                    return await ValidateApiKeyAsync(potentialKey);
-            }
-        }
-        
+        // Try query string finally (common for SignalR/WebSockets)
+        if (!Request.Path.StartsWithSegments("/api/hubs")) return AuthenticateResult.NoResult();
+        if (!Request.Query.TryGetValue("access_token", out var queryValues)) return AuthenticateResult.NoResult();
+        var potentialKey = queryValues.ToString();
+        if (potentialKey.StartsWith("ffsk_", StringComparison.OrdinalIgnoreCase))
+            return await ValidateApiKeyAsync(potentialKey);
+
         return AuthenticateResult.NoResult();
     }
 
@@ -93,10 +88,8 @@ public class ApiKeyAuthenticationHandler(
 
             if (apiKeyEntity == null)
             {
-                // We return NoResult here instead of Fail to allow other authentication handlers 
-                // (like JwtBearer) to attempt authentication if this wasn't actually a valid API key.
-                // Logger.LogWarning("API key not found in database: {ApiKeyPrefix}...",
-                //     apiKey[..Math.Min(apiKey.Length, 10)]);
+                // We return NoResult here instead of Fail to allow other authentication handlers (like JwtBearer) to
+                // attempt authentication if this wasn't a valid API key
                 return AuthenticateResult.NoResult();
             }
 
@@ -107,7 +100,7 @@ public class ApiKeyAuthenticationHandler(
                 return AuthenticateResult.Fail("API key has expired");
             }
 
-            // Queue last-used update (handled by a hosted service with its own DI scope/DbContext).
+            // Queue LastUsedAt update (handled by a hosted service)
             apiKeyUsageQueue.TryQueue(apiKeyEntity.Id);
 
             // Build claims
@@ -127,11 +120,8 @@ public class ApiKeyAuthenticationHandler(
             var principal = new ClaimsPrincipal(identity);
             var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
-            // Logger.LogDebug("API key authenticated successfully: {ApiKeyId} for project {ProjectId}",
-            //     apiKeyEntity.Id, apiKeyEntity.ProjectId);
-
-            // Cache the successful authentication ticket for ~1 minute to avoid SHA256 and repository lookup
-            // Note: We only use L1 (memory) cache here because AuthenticationTicket is not easily serializable for Redis.
+            // Cache the successful authentication ticket for 1 minute to avoid SHA256 and repository lookup
+            // Using L1 cache here because AuthenticationTicket is not easily serializable for Redis
             await cache.SetAsync(authCacheKey, ticket, AuthCacheOptions, Context.RequestAborted);
 
             return AuthenticateResult.Success(ticket);

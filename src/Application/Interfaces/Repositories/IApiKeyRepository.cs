@@ -2,10 +2,8 @@ using Domain;
 
 namespace Application.Interfaces.Repositories;
 
-/// <summary>
-///     Repository interface for ApiKey operations.
-///     Can be decorated with caching using Scrutor.
-/// </summary>
+// Repository interface for ApiKey persistence
+// Can be decorated with caching using Scrutor, implemented in the Infrastructure layer
 public interface IApiKeyRepository
 {
     Task<ApiKey?> GetByIdAsync(Guid apiKeyId, CancellationToken cancellationToken = default);
