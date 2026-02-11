@@ -3,17 +3,17 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy solution and project files
-COPY ["Web.Api/Web.Api.csproj", "Web.Api/"]
-COPY ["Application/Application.csproj", "Application/"]
-COPY ["Domain/Domain.csproj", "Domain/"]
-COPY ["Infrastructure/Infrastructure.csproj", "Infrastructure/"]
-COPY ["SharedKernel/SharedKernel.csproj", "SharedKernel/"]
+COPY ["src/Web.Api/Web.Api.csproj", "Web.Api/"]
+COPY ["src/Application/Application.csproj", "Application/"]
+COPY ["src/Domain/Domain.csproj", "Domain/"]
+COPY ["src/Infrastructure/Infrastructure.csproj", "Infrastructure/"]
+COPY ["src/SharedKernel/SharedKernel.csproj", "SharedKernel/"]
 
 # Restore dependencies
 RUN dotnet restore "Web.Api/Web.Api.csproj"
 
 # Copy all source code
-COPY . .
+COPY ["src/", "./"]
 
 # Build the application
 WORKDIR "/src/Web.Api"

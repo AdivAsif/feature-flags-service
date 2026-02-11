@@ -2,49 +2,56 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{8E1B5352-D62E-4BE8-B461-B2A40E36FCA3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Application", "Application\Application.csproj", "{91573ECD-2288-47F3-A0DB-83A796688407}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Application", "src\Application\Application.csproj", "{91573ECD-2288-47F3-A0DB-83A796688407}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Domain", "Domain\Domain.csproj", "{DD2EF049-3603-4A7D-AD2D-F72F45053AB3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Domain", "src\Domain\Domain.csproj", "{DD2EF049-3603-4A7D-AD2D-F72F45053AB3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Infrastructure", "Infrastructure\Infrastructure.csproj", "{4A1A2B02-CED8-42F7-8A01-3B77BC99FD92}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Infrastructure", "src\Infrastructure\Infrastructure.csproj", "{4A1A2B02-CED8-42F7-8A01-3B77BC99FD92}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api", "Web.Api\Web.Api.csproj", "{214EACAF-899B-47A5-B99A-D4EAE925ECC6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api", "src\Web.Api\Web.Api.csproj", "{214EACAF-899B-47A5-B99A-D4EAE925ECC6}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{9D75E543-77E9-4F03-B39A-35B9FF40A32E}"
 	ProjectSection(SolutionItems) = preProject
-		compose.prod.yaml = compose.prod.yaml
-		prometheus.yml = prometheus.yml
-		k6-load-test.js = k6-load-test.js
-		compose.dev.yaml = compose.dev.yaml
-		compose.local.yaml = compose.local.yaml
-		Dockerfile = Dockerfile
-		k6.local.mixed.js = k6.local.mixed.js
-		k6.local.read-heavy.js = k6.local.read-heavy.js
+		compose.prod.yaml = infrastructure\compose.prod.yaml
+		prometheus.yml = infrastructure\prometheus.yml
+		k6-load-test.js = infrastructure\k6-load-test.js
+		compose.dev.yaml = infrastructure\compose.dev.yaml
+		compose.local.yaml = infrastructure\compose.local.yaml
+		Dockerfile = infrastructure\Dockerfile
+		k6.local.mixed.js = infrastructure\k6.local.mixed.js
+		k6.local.read-heavy.js = infrastructure\k6.local.read-heavy.js
+		infrastructure\grafana\dashboards\feature-flags-dashboard.json = infrastructure\grafana\dashboards\feature-flags-dashboard.json
+		infrastructure\grafana\provisioning\dashboards\dashboard.yml = infrastructure\grafana\provisioning\dashboards\dashboard.yml
+		infrastructure\grafana\provisioning\datasources\prometheus.yml = infrastructure\grafana\provisioning\datasources\prometheus.yml
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedKernel", "SharedKernel\SharedKernel.csproj", "{2B3925C0-EAB3-40B6-B3C3-3EA42B512FF9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedKernel", "src\SharedKernel\SharedKernel.csproj", "{2B3925C0-EAB3-40B6-B3C3-3EA42B512FF9}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{5C7DE2B9-C375-4E51-913A-577DA9ED0F23}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Application.Tests", "Application.Tests\Application.Tests.csproj", "{1B2E19A8-0196-43AD-9C4F-846FCBF663E9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Application.Tests", "tests\Application.Tests\Application.Tests.csproj", "{1B2E19A8-0196-43AD-9C4F-846FCBF663E9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Infrastructure.Tests", "Infrastructure.Tests\Infrastructure.Tests.csproj", "{606D566C-1386-4C09-94D5-5902A773B8EA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Infrastructure.Tests", "tests\Infrastructure.Tests\Infrastructure.Tests.csproj", "{606D566C-1386-4C09-94D5-5902A773B8EA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api.Tests", "Web.Api.Tests\Web.Api.Tests.csproj", "{1978E6A7-1049-4A1F-A190-AF1FB229A8A8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Web.Api.Tests", "tests\Web.Api.Tests\Web.Api.Tests.csproj", "{1978E6A7-1049-4A1F-A190-AF1FB229A8A8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Domain.Tests", "Domain.Tests\Domain.Tests.csproj", "{04F50C7D-3E46-4574-9460-29461F2D852F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Domain.Tests", "tests\Domain.Tests\Domain.Tests.csproj", "{04F50C7D-3E46-4574-9460-29461F2D852F}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{955A5248-7E63-4D71-8FDD-F1C3DD3E4847}"
 	ProjectSection(SolutionItems) = preProject
-		ARCHITECTURE.md = ARCHITECTURE.md
-		PAGINATION.md = PAGINATION.md
-		ETAG.md = ETAG.md
-		INFRASTRUCTURE.md = INFRASTRUCTURE.md
-		MONITORING.md = MONITORING.md
-		QUICKSTART-MONITORING.md = QUICKSTART-MONITORING.md
-		README.md = README.md
-		TESTING.md = TESTING.md
+		ARCHITECTURE.md = docs\ARCHITECTURE.md
+		PAGINATION.md = docs\PAGINATION.md
+		ETAG.md = docs\ETAG.md
+		INFRASTRUCTURE.md = docs\INFRASTRUCTURE.md
+		MONITORING.md = docs\MONITORING.md
+		QUICKSTART-MONITORING.md = docs\QUICKSTART-MONITORING.md
+		README.md = docs\README.md
+		TESTING.md = docs\TESTING.md
 	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Clients", "Clients", "{22DE5760-CF65-4FFA-AE7C-6C75E250FB7A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeatureFlags.Client", "src\Clients\FeatureFlags.Client\FeatureFlags.Client.csproj", "{B15122AC-A4E8-4326-AAEC-981EDA2A7F82}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -88,6 +95,10 @@ Global
 		{04F50C7D-3E46-4574-9460-29461F2D852F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{04F50C7D-3E46-4574-9460-29461F2D852F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{04F50C7D-3E46-4574-9460-29461F2D852F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B15122AC-A4E8-4326-AAEC-981EDA2A7F82}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B15122AC-A4E8-4326-AAEC-981EDA2A7F82}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B15122AC-A4E8-4326-AAEC-981EDA2A7F82}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B15122AC-A4E8-4326-AAEC-981EDA2A7F82}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{91573ECD-2288-47F3-A0DB-83A796688407} = {8E1B5352-D62E-4BE8-B461-B2A40E36FCA3}
@@ -99,5 +110,7 @@ Global
 		{606D566C-1386-4C09-94D5-5902A773B8EA} = {5C7DE2B9-C375-4E51-913A-577DA9ED0F23}
 		{1978E6A7-1049-4A1F-A190-AF1FB229A8A8} = {5C7DE2B9-C375-4E51-913A-577DA9ED0F23}
 		{04F50C7D-3E46-4574-9460-29461F2D852F} = {5C7DE2B9-C375-4E51-913A-577DA9ED0F23}
+		{22DE5760-CF65-4FFA-AE7C-6C75E250FB7A} = {8E1B5352-D62E-4BE8-B461-B2A40E36FCA3}
+		{B15122AC-A4E8-4326-AAEC-981EDA2A7F82} = {22DE5760-CF65-4FFA-AE7C-6C75E250FB7A}
 	EndGlobalSection
 EndGlobal

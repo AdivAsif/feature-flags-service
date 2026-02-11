@@ -1,8 +1,8 @@
-﻿services:
+services:
   api:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: infrastructure/Dockerfile
     container_name: feature_flags_api
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
@@ -19,9 +19,9 @@
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:8080/health || exit 1" ]
       interval: 5s
-      timeout: 3s
-      retries: 5
-      start_period: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -38,6 +38,8 @@
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: feature_flags_db
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
     networks:
@@ -47,6 +49,7 @@
       interval: 10s
       timeout: 5s
       retries: 5
+    command: [ "postgres", "-c", "max_connections=100", "-c", "synchronous_commit=off", "-c", "full_page_writes=off" ]
   
   redis:
     image: redis:latest
@@ -55,13 +58,12 @@
       - "6379:6379"
     networks:
       - feature-flags-network
-    volumes:
-      - redis_data:/data
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
+    command: [ "redis-server", "--save", "", "--appendonly", "no" ]
   
   prometheus:
     image: prom/prometheus:latest
@@ -69,17 +71,18 @@
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
       - '--web.enable-lifecycle'
     volumes:
       - "./prometheus.yml:/etc/prometheus/prometheus.yml"
-      - "prometheus_data:/prometheus"
+      - "prometheus_data:/prometheus:tmpfs"
     networks:
       - feature-flags-network
     ports:
       - "9090:9090"
     restart: unless-stopped
+  
+  renderer:
+    image: grafana/grafana-image-renderer:latest
   
   grafana:
     image: grafana/grafana:latest
@@ -89,6 +92,8 @@
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_RENDERING_SERVER_URL=http://renderer:8081/render
+      - GF_RENDERING_CALLBACK_URL=http://grafana:3000/
     volumes:
       - "grafana_data:/var/lib/grafana"
       - "./grafana/provisioning:/etc/grafana/provisioning"
@@ -106,7 +111,7 @@
     networks:
       - feature-flags-network
     volumes:
-      - "./k6-load-test.js:/scripts/k6-load-test.js"
+      - "./k6.local.mixed.js:/scripts/k6-load-test.js"
       - "k6_results:/results"
     environment:
       - K6_OUT=json=/results/k6-results.json
@@ -124,7 +129,6 @@ networks:
     driver: bridge
 
 volumes:
-  redis_data: { }
   prometheus_data: { }
   grafana_data: { }
   k6_results: { }
