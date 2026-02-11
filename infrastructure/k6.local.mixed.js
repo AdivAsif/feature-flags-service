@@ -104,7 +104,7 @@ export default function (data) {
     if (isReadOperation) {
         // Read operations: Get all flags or evaluate
         const readType = Math.random();
-        
+
         if (readType < 0.6) {
             // Get all feature flags with pagination
             const res = http.get(`${BASE_URL}/feature-flags?first=20`, {headers});
@@ -129,7 +129,7 @@ export default function (data) {
             // Evaluate a random flag (simulate common keys)
             const flagKeys = ['test-flag', 'feature-a', 'feature-b', 'rollout-flag'];
             const randomKey = flagKeys[Math.floor(Math.random() * flagKeys.length)];
-            
+
             const res = http.get(`${BASE_URL}/evaluation/${randomKey}`, {headers});
 
             const success = check(res, {
@@ -141,7 +141,7 @@ export default function (data) {
     } else {
         // Write operations: Create, update, or delete
         const writeType = Math.random();
-        
+
         if (writeType < 0.5) {
             // Create a feature flag
             const payload = JSON.stringify({

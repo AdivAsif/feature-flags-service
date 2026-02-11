@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Application.Exceptions;
 using Application.Interfaces;
 using Web.Api.Extensions;
@@ -9,13 +10,22 @@ public class GetByKey : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapGet("/feature-flags/{key}",
-                async (string key, HttpContext httpContext, IFeatureFlagsService featureFlagsService,
+                async (string key, HttpContext httpContext, ClaimsPrincipal user,
+                    IFeatureFlagsService featureFlagsService,
                     ILogger<GetByKey> logger) =>
                 {
                     try
                     {
-                        logger.LogInformation("Getting feature flag by key: {Key}", key);
-                        var featureFlag = await featureFlagsService.GetByKeyAsync(key);
+                        var projectId = user.GetProjectId();
+                        if (projectId == null)
+                        {
+                            logger.LogWarning("Request missing projectId claim");
+                            return Results.Unauthorized();
+                        }
+
+                        logger.LogInformation("Getting feature flag by key: {Key} for project: {ProjectId}", key,
+                            projectId);
+                        var featureFlag = await featureFlagsService.GetByKeyAsync(projectId.Value, key);
 
                         if (featureFlag == null) return Results.NotFound($"Feature flag with key: {key} not found");
 

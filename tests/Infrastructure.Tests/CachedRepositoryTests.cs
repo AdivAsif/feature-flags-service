@@ -46,47 +46,14 @@ public class CachedRepositoryTests
 
     #endregion
 
-    #region GetByKeyAsync Tests
-
-    [Fact]
-    public async Task GetByKeyAsync_ShouldUseMappingCache()
-    {
-        // Arrange
-        var key = "test-feature";
-        var id = Guid.NewGuid();
-        var featureFlag = new FeatureFlag { Id = id, Key = key };
-
-        _cache.GetOrSetAsync(
-                Arg.Is<string>(s => s.Contains("mapping")),
-                Arg.Any<Func<FusionCacheFactoryExecutionContext<Guid?>, CancellationToken, Task<Guid?>>>(),
-                Arg.Any<FusionCacheEntryOptions?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(id);
-
-        _cache.GetOrSetAsync<FeatureFlag>(
-                Arg.Is<string>(s => s.Contains(id.ToString())),
-                Arg.Any<Func<FusionCacheFactoryExecutionContext<FeatureFlag>, CancellationToken, Task<FeatureFlag?>>>(),
-                Arg.Any<FusionCacheEntryOptions?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(featureFlag);
-
-        // Act
-        var result = await _cachedRepository.GetByKeyAsync(key);
-
-        // Assert
-        result.Should().NotBeNull();
-        result!.Key.Should().Be(key);
-    }
-
-    #endregion
-
     #region CreateAsync Tests
 
     [Fact]
-    public async Task CreateAsync_ShouldInvalidateAllCache()
+    public async Task CreateAsync_ShouldCacheEntityWithProjectScope()
     {
         // Arrange
-        var featureFlag = new FeatureFlag { Id = Guid.NewGuid(), Key = "new-feature" };
+        var projectId = Guid.NewGuid();
+        var featureFlag = new FeatureFlag { Id = Guid.NewGuid(), ProjectId = projectId, Key = "new-feature" };
         _innerRepository.CreateAsync(featureFlag).Returns(featureFlag);
 
         // Act
@@ -94,13 +61,11 @@ public class CachedRepositoryTests
 
         // Assert
         await _innerRepository.Received(1).CreateAsync(featureFlag);
+
+        // Verify cache key includes projectId (format: FeatureFlag:{projectId}:{id})
         await _cache.Received().SetAsync(
-            Arg.Is<string>(s => s.Contains(featureFlag.Id.ToString())),
+            Arg.Is<string>(s => s.Contains(projectId.ToString()) && s.Contains(featureFlag.Id.ToString())),
             featureFlag,
-            Arg.Any<FusionCacheEntryOptions?>(),
-            Arg.Any<CancellationToken>());
-        await _cache.Received().RemoveAsync(
-            Arg.Is<string>(s => s.Contains("all")),
             Arg.Any<FusionCacheEntryOptions?>(),
             Arg.Any<CancellationToken>());
     }
@@ -113,7 +78,13 @@ public class CachedRepositoryTests
     public async Task UpdateAsync_ShouldUpdateCacheAndInvalidateAll()
     {
         // Arrange
-        var featureFlag = new FeatureFlag { Id = Guid.NewGuid(), Key = "test-feature" };
+        var projectId = Guid.NewGuid();
+        var featureFlag = new FeatureFlag
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = projectId,
+            Key = "test-feature"
+        };
         _innerRepository.UpdateAsync(featureFlag).Returns(featureFlag);
 
         // Act
@@ -122,7 +93,7 @@ public class CachedRepositoryTests
         // Assert
         await _innerRepository.Received(1).UpdateAsync(featureFlag);
         await _cache.Received().SetAsync(
-            Arg.Is<string>(s => s.Contains(featureFlag.Id.ToString())),
+            Arg.Is<string>(s => s.Contains(projectId.ToString()) && s.Contains(featureFlag.Id.ToString())),
             featureFlag,
             Arg.Any<FusionCacheEntryOptions?>(),
             Arg.Any<CancellationToken>());

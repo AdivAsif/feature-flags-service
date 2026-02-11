@@ -4,7 +4,6 @@ using Application.Interfaces;
 using Application.Services;
 using Domain;
 using FluentAssertions;
-using Microsoft.Extensions.Logging;
 using NSubstitute;
 using SharedKernel;
 
@@ -21,54 +20,6 @@ public class AuditLogsServiceTests
         var mapper = new AuditLogMapper();
         _service = new AuditLogsService(_repository, mapper);
     }
-
-    #region GetAsync Tests
-
-    [Fact]
-    public async Task GetAsync_WithValidId_ShouldReturnAuditLog()
-    {
-        // Arrange
-        var id = Guid.NewGuid();
-        var featureFlagId = Guid.NewGuid();
-        var auditLog = new AuditLog
-        {
-            Id = id,
-            FeatureFlagId = featureFlagId,
-            Action = AuditLogAction.Create,
-            NewStateJson = "{\"enabled\":true}",
-            CreatedAt = DateTime.UtcNow,
-            PerformedByUserId = "user123",
-            PerformedByUserEmail = "user@example.com"
-        };
-        _repository.GetByIdAsync(id).Returns(auditLog);
-
-        // Act
-        var result = await _service.GetAsync(id);
-
-        // Assert
-        result.Should().NotBeNull();
-        result!.Id.Should().Be(id);
-        result.FeatureFlagId.Should().Be(featureFlagId);
-        result.Action.Should().Be(AuditLogAction.Create);
-        await _repository.Received(1).GetByIdAsync(id);
-    }
-
-    [Fact]
-    public async Task GetAsync_WithInvalidId_ShouldThrowNotFoundException()
-    {
-        // Arrange
-        var id = Guid.NewGuid();
-        _repository.GetByIdAsync(id).Returns((AuditLog?)null);
-
-        // Act
-        var act = async () => await _service.GetAsync(id);
-
-        // Assert
-        await act.Should().ThrowAsync<NotFoundException>()
-            .WithMessage($"Audit Log with id: {id} not found");
-    }
-
-    #endregion
 
     #region GetAllAsync Tests
 
@@ -156,6 +107,54 @@ public class AuditLogsServiceTests
         result.Items.Should().HaveCount(1);
         result.PageInfo.TotalCount.Should().Be(1);
         result.PageInfo.HasNextPage.Should().BeFalse();
+    }
+
+    #endregion
+
+    #region GetAsync Tests
+
+    [Fact]
+    public async Task GetAsync_WithValidId_ShouldReturnAuditLog()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+        var featureFlagId = Guid.NewGuid();
+        var auditLog = new AuditLog
+        {
+            Id = id,
+            FeatureFlagId = featureFlagId,
+            Action = AuditLogAction.Create,
+            NewStateJson = "{\"enabled\":true}",
+            CreatedAt = DateTime.UtcNow,
+            PerformedByUserId = "user123",
+            PerformedByUserEmail = "user@example.com"
+        };
+        _repository.GetByIdAsync(id).Returns(auditLog);
+
+        // Act
+        var result = await _service.GetAsync(id);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Id.Should().Be(id);
+        result.FeatureFlagId.Should().Be(featureFlagId);
+        result.Action.Should().Be(AuditLogAction.Create);
+        await _repository.Received(1).GetByIdAsync(id);
+    }
+
+    [Fact]
+    public async Task GetAsync_WithInvalidId_ShouldThrowNotFoundException()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+        _repository.GetByIdAsync(id).Returns((AuditLog?)null);
+
+        // Act
+        var act = async () => await _service.GetAsync(id);
+
+        // Assert
+        await act.Should().ThrowAsync<NotFoundException>()
+            .WithMessage($"Audit Log with id: {id} not found");
     }
 
     #endregion

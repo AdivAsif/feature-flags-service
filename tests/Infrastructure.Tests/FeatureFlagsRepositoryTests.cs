@@ -136,9 +136,11 @@ public class FeatureFlagsRepositoryTests : IDisposable
     public async Task GetByKeyAsync_WithExistingKey_ShouldReturnFeatureFlag()
     {
         // Arrange
+        var projectId = Guid.NewGuid();
         var featureFlag = new FeatureFlag
         {
             Id = Guid.NewGuid(),
+            ProjectId = projectId,
             Key = "test-feature",
             Description = "Test",
             Enabled = true,
@@ -148,7 +150,7 @@ public class FeatureFlagsRepositoryTests : IDisposable
         await _context.SaveChangesAsync();
 
         // Act
-        var result = await _repository.GetByKeyAsync("test-feature");
+        var result = await _repository.GetByKeyAsync(projectId, "test-feature");
 
         // Assert
         result.Should().NotBeNull();
@@ -158,8 +160,11 @@ public class FeatureFlagsRepositoryTests : IDisposable
     [Fact]
     public async Task GetByKeyAsync_WithNonExistentKey_ShouldReturnNull()
     {
+        // Arrange
+        var projectId = Guid.NewGuid();
+
         // Act
-        var result = await _repository.GetByKeyAsync("non-existent");
+        var result = await _repository.GetByKeyAsync(projectId, "non-existent");
 
         // Assert
         result.Should().BeNull();

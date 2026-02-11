@@ -1,5 +1,4 @@
 ﻿using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Web.Api.Extensions;
@@ -9,13 +8,16 @@ public static class JwtBearerConfiguration
     public static IServiceCollection AddJwtBearerAuthentication(this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        services.AddAuthentication()
             .AddJwtBearer(options =>
             {
                 options.Authority = configuration["Auth:Authority"];
                 options.Audience = configuration["Auth:Audience"];
                 var secret = configuration["JwtSecretKey"] ?? configuration["Auth:Authority"] ??
                     throw new InvalidOperationException("JWT Secret Key not configured.");
+
+                // Disable automatic claim type mapping
+                options.MapInboundClaims = false;
 
                 options.TokenValidationParameters = new TokenValidationParameters
                 {

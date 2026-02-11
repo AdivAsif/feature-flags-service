@@ -1,4 +1,3 @@
-using System.Threading.Channels;
 using Application.DTOs;
 using Application.Interfaces;
 using Application.Services;
@@ -47,21 +46,21 @@ public class AuditLogBackgroundServiceTests
 
         // Act
         await queue.QueueAuditLogAsync(auditLog);
-        
+
         var cts = new CancellationTokenSource();
         var executeTask = backgroundService.StartAsync(cts.Token);
 
         // Give it a moment to process
         await Task.Delay(100);
-        
+
         // Stop the service
         cts.Cancel();
         await backgroundService.StopAsync(CancellationToken.None);
 
         // Assert
-        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogDTO>(
-            a => a.FeatureFlagId == auditLog.FeatureFlagId && 
-                 a.Action == AuditLogAction.Create));
+        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogDTO>(a =>
+            a.FeatureFlagId == auditLog.FeatureFlagId &&
+            a.Action == AuditLogAction.Create));
     }
 
     [Fact]
@@ -100,16 +99,16 @@ public class AuditLogBackgroundServiceTests
 
         // Act
         await queue.QueueAuditLogAsync(auditLog);
-        
+
         var cts = new CancellationTokenSource();
         var executeTask = backgroundService.StartAsync(cts.Token);
 
         // Give it a moment to process
         await Task.Delay(100);
-        
+
         // Stop the service
         cts.Cancel();
-        
+
         // Act - should not throw
         var act = async () => await backgroundService.StopAsync(CancellationToken.None);
 
@@ -165,13 +164,13 @@ public class AuditLogBackgroundServiceTests
         // Act
         await queue.QueueAuditLogAsync(auditLog1);
         await queue.QueueAuditLogAsync(auditLog2);
-        
+
         var cts = new CancellationTokenSource();
         var executeTask = backgroundService.StartAsync(cts.Token);
 
         // Give it time to process both
         await Task.Delay(200);
-        
+
         // Stop the service
         cts.Cancel();
         await backgroundService.StopAsync(CancellationToken.None);

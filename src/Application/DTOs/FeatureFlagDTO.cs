@@ -6,6 +6,7 @@ namespace Application.DTOs;
 
 public sealed class FeatureFlagDTO : DtoBase
 {
+    public Guid ProjectId { get; set; }
     public int Version { get; set; } = 1;
     public string Key { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;

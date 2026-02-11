@@ -4,12 +4,18 @@ using System.Text;
 using Application.DTOs;
 using Application.Interfaces;
 using Application.Services;
+using Asp.Versioning;
 using Domain;
+using Infrastructure.Authentication;
 using Infrastructure.Data;
 using Infrastructure.Repositories;
+using Infrastructure.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 using Prometheus;
 using Scalar.AspNetCore;
 using Serilog;
@@ -20,7 +26,20 @@ using ZiggyCreatures.Caching.Fusion;
 using ZiggyCreatures.Caching.Fusion.Backplane.StackExchangeRedis;
 using ZiggyCreatures.Caching.Fusion.Serialization.SystemTextJson;
 
+// Clear default JWT claim type mappings to use short claim names
+JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+JwtSecurityTokenHandler.DefaultOutboundClaimTypeMap.Clear();
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddProblemDetails();
+
+builder.Services.AddApiVersioning(options =>
+{
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.ReportApiVersions = true;
+});
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -29,12 +48,53 @@ var logger = new LoggerConfiguration()
 
 Log.Logger = logger;
 
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer((document, _, _) =>
+    {
+        document.Components ??= new OpenApiComponents();
+        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+
+        document.Components.SecuritySchemes.Add("Bearer", new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            In = ParameterLocation.Header,
+            BearerFormat = "JWT"
+        });
+
+        document.Components.SecuritySchemes.Add("ApiKey", new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.ApiKey,
+            In = ParameterLocation.Header,
+            Name = "X-API-Key"
+        });
+        document.Security =
+        [
+            new OpenApiSecurityRequirement
+            {
+                {
+                    new OpenApiSecuritySchemeReference("Bearer"),
+                    ["api"]
+                }
+            }
+        ];
+        document.SetReferenceHostDocument();
+        return Task.CompletedTask;
+    });
+});
 builder.Services.AddNpgsql<FeatureFlagsDbContext>(builder.Configuration.GetConnectionString("FeatureFlagsDatabase") ??
                                                   throw new InvalidOperationException(
                                                       "Connection string 'FeatureFlagsDatabase' not found."));
 builder.Services.AddScoped<IKeyedRepository<FeatureFlag>, FeatureFlagsRepository>();
 builder.Services.AddScoped<IRepository<AuditLog>, AuditLogsRepository>();
+builder.Services.AddScoped<ProjectRepository>();
+builder.Services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
+builder.Services.AddScoped<CachedApiKeyRepository>();
+builder.Services.AddScoped<IProjectService, ProjectService>();
+builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
+builder.Services.AddSingleton<ApiKeyUsageQueue>();
+builder.Services.AddHostedService<ApiKeyUsageBackgroundService>();
 builder.Services.AddSingleton<FeatureFlagMapper>();
 builder.Services.AddSingleton<AuditLogMapper>();
 builder.Services.AddScoped<IFeatureFlagsService, FeatureFlagsService>();
@@ -43,7 +103,11 @@ builder.Services.AddScoped<IAuditLogsService, AuditLogsService>();
 builder.Services.AddSingleton<AuditLogQueue>();
 builder.Services.AddHostedService<AuditLogBackgroundService>();
 builder.Services.AddEndpoints(typeof(Program).Assembly);
+
+// Decorate repositories with caching using Scrutor
 builder.Services.Decorate<IKeyedRepository<FeatureFlag>, CachedKeyedRepository<FeatureFlag>>();
+builder.Services.Decorate<IApiKeyRepository, CachedApiKeyRepository>();
+
 builder.Services.AddMemoryCache();
 builder.Services.AddFusionCache()
     .WithOptions(options =>
@@ -96,34 +160,135 @@ builder.Services.AddFusionCache()
     );
 
 builder.Services.AddJwtBearerAuthentication(builder.Configuration);
-builder.Services.AddAuthorizationBuilder()
-    .AddPolicy("CanReadFlags", policy => policy.RequireClaim("scope", "flags:read"))
-    .AddPolicy("CanWriteFlags", policy => policy.RequireClaim("scope", "flags:write"))
-    .AddPolicy("CanDeleteFlags", policy => policy.RequireClaim("scope", "flags:delete"))
-    .AddPolicy("User", policy => policy.RequireClaim("role", "user"))
-    .AddPolicy("Admin", policy => policy.RequireClaim("role", "admin"))
-    .AddPolicy("ReadAccess", policy =>
+builder.Services.AddApiKeyAuthentication();
+
+// Configure authorization policies
+builder.Services.AddAuthorization(options =>
+{
+    // Default policy - accepts both JWT and API Key authentication
+    options.DefaultPolicy = new AuthorizationPolicyBuilder()
+        .AddAuthenticationSchemes(
+            JwtBearerDefaults.AuthenticationScheme,
+            ApiKeyAuthenticationOptions.DefaultScheme)
+        .RequireAuthenticatedUser()
+        .Build();
+
+    // ========================================
+    // Management Policies (JWT Only)
+    // Used for project and API key management
+    // ========================================
+
+    // Admin-only policy - for creating/managing projects and API keys
+    options.AddPolicy("Admin", policy =>
+    {
+        policy.AddAuthenticationSchemes(JwtBearerDefaults
+            .AuthenticationScheme);
         policy.RequireAssertion(context =>
         {
-            var hasScope = context.User.HasClaim(c => c.Type == "scope" && c.Value.Split(' ').Contains("flags:read"));
+            // Check for role claim in any format (short or XML URI)
+            var hasAdminRole = context.User.HasClaim(c =>
+                (c.Type == "role" || c.Type == ClaimTypes.Role) && c.Value == "admin");
+
+            var logger = context.Resource as HttpContext;
+            logger?.RequestServices.GetService<ILogger<Program>>()?.LogWarning(
+                "Admin policy check: HasAdminRole={HasRole}, Claims={Claims}",
+                hasAdminRole,
+                string.Join(", ", context.User.Claims.Select(c => $"{c.Type}={c.Value}")));
+            return hasAdminRole;
+        });
+    });
+
+    // User policy - for viewing projects and API keys
+    options.AddPolicy("User", policy =>
+    {
+        policy.AddAuthenticationSchemes(JwtBearerDefaults
+            .AuthenticationScheme);
+        policy.RequireAssertion(context =>
+        {
+            var hasUserRole = context.User.HasClaim(c =>
+                (c.Type == "role" || c.Type == ClaimTypes.Role) &&
+                (c.Value == "user" || c.Value == "admin"));
+            return hasUserRole;
+        });
+    });
+
+    // ========================================
+    // Feature Flag Policies (JWT or API Key)
+    // Used for feature flag CRUD operations
+    // ========================================
+
+    // Read access - API Key with flags:read scope OR JWT with user/admin role
+    options.AddPolicy("ReadAccess", policy =>
+    {
+        policy.AddAuthenticationSchemes(
+            JwtBearerDefaults.AuthenticationScheme,
+            ApiKeyAuthenticationOptions.DefaultScheme);
+        policy.RequireAssertion(context =>
+        {
+            // API Key with read scope
+            var hasReadScope = context.User.HasClaim(c =>
+                c.Type == "scope" && c.Value.Split(' ').Contains("flags:read"));
+
+            // JWT with user or admin role
             var isUser = context.User.HasClaim("role", "user");
             var isAdmin = context.User.HasClaim("role", "admin");
-            return hasScope || isUser || isAdmin;
-        }))
-    .AddPolicy("WriteAccess", policy =>
+
+            return hasReadScope || isUser || isAdmin;
+        });
+    });
+
+    // Write access - API Key with flags:write scope OR JWT with admin role
+    options.AddPolicy("WriteAccess", policy =>
+    {
+        policy.AddAuthenticationSchemes(
+            JwtBearerDefaults.AuthenticationScheme,
+            ApiKeyAuthenticationOptions.DefaultScheme);
         policy.RequireAssertion(context =>
         {
-            var hasScope = context.User.HasClaim(c => c.Type == "scope" && c.Value.Split(' ').Contains("flags:write"));
+            // API Key with write scope
+            var hasWriteScope = context.User.HasClaim(c =>
+                c.Type == "scope" && c.Value.Split(' ').Contains("flags:write"));
+
+            // JWT with admin role
             var isAdmin = context.User.HasClaim("role", "admin");
-            return hasScope || isAdmin;
-        }))
-    .AddPolicy("DeleteAccess", policy =>
+
+            return hasWriteScope || isAdmin;
+        });
+    });
+
+    // Delete access - API Key with flags:delete scope OR JWT with admin role
+    options.AddPolicy("DeleteAccess", policy =>
+    {
+        policy.AddAuthenticationSchemes(
+            JwtBearerDefaults.AuthenticationScheme,
+            ApiKeyAuthenticationOptions.DefaultScheme);
         policy.RequireAssertion(context =>
         {
-            var hasScope = context.User.HasClaim(c => c.Type == "scope" && c.Value.Split(' ').Contains("flags:delete"));
+            // API Key with delete scope
+            var hasDeleteScope = context.User.HasClaim(c =>
+                c.Type == "scope" && c.Value.Split(' ').Contains("flags:delete"));
+
+            // JWT with admin role
             var isAdmin = context.User.HasClaim("role", "admin");
-            return hasScope || isAdmin;
-        }));
+
+            return hasDeleteScope || isAdmin;
+        });
+    });
+
+    // ========================================
+    // Evaluation Policy (API Key Only)
+    // Used for flag evaluation endpoint
+    // ========================================
+
+    // Evaluation access - API Key only (not for human users)
+    options.AddPolicy("EvaluateAccess", policy =>
+    {
+        policy.AddAuthenticationSchemes(ApiKeyAuthenticationOptions.DefaultScheme);
+        policy.RequireAssertion(context =>
+            context.User.HasClaim(c =>
+                c.Type == "scope" && c.Value.Split(' ').Contains("flags:read")));
+    });
+});
 builder.Services.AddHealthChecks();
 
 var app = builder.Build();
@@ -138,8 +303,8 @@ if (app.Environment.IsDevelopment())
     {
         var claims = new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, devTokenRequest.UserId),
-            new Claim(ClaimTypes.Email, devTokenRequest.Email),
+            new Claim("sub", devTokenRequest.UserId),
+            new Claim("email", devTokenRequest.Email),
             new Claim("scope", string.Join(" ", devTokenRequest.Scopes)),
             new Claim("role", devTokenRequest.Role)
         };
@@ -173,9 +338,14 @@ app.UseMiddleware<ETagMiddleware>();
 app.UseHttpMetrics();
 app.MapMetrics();
 
-app.MapEndpoints();
+var api = app.NewVersionedApi();
+var v1 = api.MapGroup("/api").HasApiVersion(new ApiVersion(1, 0));
+v1.MapEndpoints(app.Services);
 
 // Apply database migrations on startup
 await app.Services.ApplyMigrationsAsync();
+
+if (app.Environment.IsDevelopment())
+    await app.Services.SeedDatabaseAsync();
 
 app.Run();

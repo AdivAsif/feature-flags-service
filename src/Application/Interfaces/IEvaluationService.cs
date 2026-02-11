@@ -5,5 +5,5 @@ namespace Application.Interfaces;
 
 public interface IEvaluationService
 {
-    Task<EvaluationResultDTO> EvaluateAsync(string featureFlagKey, EvaluationContext context);
+    Task<EvaluationResultDTO> EvaluateAsync(Guid projectId, string featureFlagKey, EvaluationContext context);
 }

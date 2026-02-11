@@ -18,6 +18,12 @@ public sealed class FeatureFlagsRepository(FeatureFlagsDbContext dbContext) : IK
         return await dbContext.FeatureFlags.AsNoTracking().FirstOrDefaultAsync(ff => ff.Key == key);
     }
 
+    public async Task<FeatureFlag?> GetByKeyAsync(Guid projectId, string key)
+    {
+        return await dbContext.FeatureFlags.AsNoTracking()
+            .FirstOrDefaultAsync(ff => ff.ProjectId == projectId && ff.Key == key);
+    }
+
     public async Task<IEnumerable<FeatureFlag>> GetAllAsync(int? take, int? skip)
     {
         return await dbContext.FeatureFlags.AsNoTracking().ToListAsync();
@@ -26,49 +32,7 @@ public sealed class FeatureFlagsRepository(FeatureFlagsDbContext dbContext) : IK
     public async Task<PagedResult<FeatureFlag>> GetPagedAsync(int first = 10, string? after = null,
         string? before = null)
     {
-        first = Math.Clamp(first, 1, 100);
-
-        var query = dbContext.FeatureFlags.AsNoTracking().OrderBy(ff => ff.CreatedAt).ThenBy(ff => ff.Id);
-
-        if (!string.IsNullOrWhiteSpace(after) &&
-            CursorHelper.TryDecodeCursor(after, out var afterId, out var afterCreatedAt))
-            query = query
-                .Where(ff => ff.CreatedAt > afterCreatedAt || (ff.CreatedAt == afterCreatedAt && ff.Id > afterId))
-                .OrderBy(ff => ff.CreatedAt)
-                .ThenBy(ff => ff.Id);
-        else if (!string.IsNullOrWhiteSpace(before) &&
-                 CursorHelper.TryDecodeCursor(before, out var beforeId, out var beforeCreatedAt))
-            query = query
-                .Where(ff => ff.CreatedAt < beforeCreatedAt || (ff.CreatedAt == beforeCreatedAt && ff.Id < beforeId))
-                .OrderByDescending(ff => ff.CreatedAt)
-                .ThenByDescending(ff => ff.Id);
-
-        var items = await query.Take(first + 1).ToListAsync();
-
-        var hasNextPage = items.Count > first;
-        if (hasNextPage) items = items.Take(first).ToList();
-
-        if (!string.IsNullOrWhiteSpace(before)) items.Reverse();
-
-        var totalCount = await dbContext.FeatureFlags.CountAsync();
-
-        var startCursor = items.Count > 0 ? CursorHelper.EncodeCursor(items.First().Id, items.First().CreatedAt) : null;
-        var endCursor = items.Count > 0 ? CursorHelper.EncodeCursor(items.Last().Id, items.Last().CreatedAt) : null;
-
-        var hasPreviousPage = !string.IsNullOrWhiteSpace(after) || (!string.IsNullOrWhiteSpace(before) && hasNextPage);
-
-        return new PagedResult<FeatureFlag>
-        {
-            Items = items,
-            PageInfo = new PageInfo
-            {
-                HasNextPage = string.IsNullOrWhiteSpace(before) && hasNextPage,
-                HasPreviousPage = hasPreviousPage,
-                StartCursor = startCursor,
-                EndCursor = endCursor,
-                TotalCount = totalCount
-            }
-        };
+        return await GetPagedAsync(Guid.Empty, first, after, before);
     }
 
     // CREATE
@@ -95,5 +59,73 @@ public sealed class FeatureFlagsRepository(FeatureFlagsDbContext dbContext) : IK
         if (featureFlag == null) return;
         dbContext.FeatureFlags.Remove(featureFlag);
         await dbContext.SaveChangesAsync();
+    }
+
+    public async Task<FeatureFlag?> GetByIdAsync(Guid projectId, Guid id)
+    {
+        return await dbContext.FeatureFlags.AsNoTracking()
+            .FirstOrDefaultAsync(ff => ff.ProjectId == projectId && ff.Id == id);
+    }
+
+    public async Task<IEnumerable<FeatureFlag>> GetAllAsync(Guid projectId, int? take, int? skip)
+    {
+        return await dbContext.FeatureFlags.AsNoTracking()
+            .Where(ff => ff.ProjectId == projectId)
+            .ToListAsync();
+    }
+
+    public async Task<PagedResult<FeatureFlag>> GetPagedAsync(Guid projectId, int first = 10, string? after = null,
+        string? before = null)
+    {
+        first = Math.Clamp(first, 1, 100);
+
+        var query = dbContext.FeatureFlags.AsNoTracking();
+
+        if (projectId != Guid.Empty)
+            query = query.Where(ff => ff.ProjectId == projectId);
+
+        query = query.OrderBy(ff => ff.CreatedAt).ThenBy(ff => ff.Id);
+
+        if (!string.IsNullOrWhiteSpace(after) &&
+            CursorHelper.TryDecodeCursor(after, out var afterId, out var afterCreatedAt))
+            query = query
+                .Where(ff => ff.CreatedAt > afterCreatedAt || (ff.CreatedAt == afterCreatedAt && ff.Id > afterId))
+                .OrderBy(ff => ff.CreatedAt)
+                .ThenBy(ff => ff.Id);
+        else if (!string.IsNullOrWhiteSpace(before) &&
+                 CursorHelper.TryDecodeCursor(before, out var beforeId, out var beforeCreatedAt))
+            query = query
+                .Where(ff => ff.CreatedAt < beforeCreatedAt || (ff.CreatedAt == beforeCreatedAt && ff.Id < beforeId))
+                .OrderByDescending(ff => ff.CreatedAt)
+                .ThenByDescending(ff => ff.Id);
+
+        var items = await query.Take(first + 1).ToListAsync();
+
+        var hasNextPage = items.Count > first;
+        if (hasNextPage) items = items.Take(first).ToList();
+
+        if (!string.IsNullOrWhiteSpace(before)) items.Reverse();
+
+        var totalCount = projectId != Guid.Empty
+            ? await dbContext.FeatureFlags.CountAsync(ff => ff.ProjectId == projectId)
+            : await dbContext.FeatureFlags.CountAsync();
+
+        var startCursor = items.Count > 0 ? CursorHelper.EncodeCursor(items.First().Id, items.First().CreatedAt) : null;
+        var endCursor = items.Count > 0 ? CursorHelper.EncodeCursor(items.Last().Id, items.Last().CreatedAt) : null;
+
+        var hasPreviousPage = !string.IsNullOrWhiteSpace(after) || (!string.IsNullOrWhiteSpace(before) && hasNextPage);
+
+        return new PagedResult<FeatureFlag>
+        {
+            Items = items,
+            PageInfo = new PageInfo
+            {
+                HasNextPage = string.IsNullOrWhiteSpace(before) && hasNextPage,
+                HasPreviousPage = hasPreviousPage,
+                StartCursor = startCursor,
+                EndCursor = endCursor,
+                TotalCount = totalCount
+            }
+        };
     }
 }

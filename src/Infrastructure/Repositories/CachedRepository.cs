@@ -8,8 +8,10 @@ public class CachedRepository<T>(IRepository<T> innerRepository, IFusionCache ca
 {
     public async Task<T?> GetByIdAsync(Guid id)
     {
+        var cacheKey = GetCacheKey(id);
+
         var entity = await cache.GetOrSetAsync<T>(
-            $"{typeof(T).Name}:{id}",
+            cacheKey,
             _ => innerRepository.GetByIdAsync(id));
 
         return entity;
@@ -17,22 +19,17 @@ public class CachedRepository<T>(IRepository<T> innerRepository, IFusionCache ca
 
     public async Task<IEnumerable<T>> GetAllAsync(int? take, int? skip)
     {
-        var entities = await cache.GetOrSetAsync<IEnumerable<T>>(
-            $"{typeof(T).Name}:all({take},{skip})",
-            _ => innerRepository.GetAllAsync(take, skip));
-
+        // GetAllAsync should NEVER be cached across projects
+        // This would be a security issue - always query DB
+        var entities = await innerRepository.GetAllAsync(take, skip);
         return entities;
     }
 
     public async Task<PagedResult<T>> GetPagedAsync(int first = 10, string? after = null, string? before = null)
     {
-        var cacheKey = $"{typeof(T).Name}:paged(first:{first},after:{after ?? "null"},before:{before ?? "null"})";
-
-        var result = await cache.GetOrSetAsync<PagedResult<T>>(
-            cacheKey,
-            _ => innerRepository.GetPagedAsync(first, after, before),
-            options => options.SetDuration(TimeSpan.FromSeconds(30)));
-
+        // GetPagedAsync should NEVER be cached across projects
+        // This would be a security issue - always query DB
+        var result = await innerRepository.GetPagedAsync(first, after, before);
         return result;
     }
 
@@ -61,33 +58,82 @@ public class CachedRepository<T>(IRepository<T> innerRepository, IFusionCache ca
         await RemoveFromCache(id, entity);
     }
 
+    /// <summary>
+    ///     Generate cache key with project scoping if entity is multi-tenant.
+    ///     Format: {TypeName}:{ProjectId}:{Id} for multi-tenant
+    ///     Format: {TypeName}:{Id} for single-tenant
+    /// </summary>
+    private static string GetCacheKey(Guid id, Guid? projectId = null)
+    {
+        var typeName = typeof(T).Name;
+
+        // If T implements IMultiTenant, we need project-scoped keys
+        if (typeof(IMultiTenant).IsAssignableFrom(typeof(T)))
+        {
+            // If projectId is provided, use it
+            if (projectId.HasValue)
+                return $"{typeName}:{projectId.Value}:{id}";
+
+            // If not provided, use a placeholder (will be set on read from DB)
+            return $"{typeName}:*:{id}";
+        }
+
+        // Non-multi-tenant entities use simple key
+        return $"{typeName}:{id}";
+    }
+
+    /// <summary>
+    ///     Generate cache key for key-based lookup (multi-tenant aware).
+    ///     Format: {TypeName}:{ProjectId}:key:{Key}
+    /// </summary>
+    private static string GetKeyMappingCacheKey(string key, Guid? projectId = null)
+    {
+        var typeName = typeof(T).Name;
+
+        if (typeof(IMultiTenant).IsAssignableFrom(typeof(T)))
+        {
+            if (projectId.HasValue)
+                return $"{typeName}:{projectId.Value}:key:{key}";
+
+            return $"{typeName}:*:key:{key}";
+        }
+
+        return $"{typeName}:mapping:{key}";
+    }
+
+    /// <summary>
+    ///     Extract ProjectId from entity if it implements IMultiTenant.
+    /// </summary>
+    private static Guid? GetProjectId(T? entity)
+    {
+        return entity is IMultiTenant multiTenant ? multiTenant.ProjectId : null;
+    }
+
     // Helpers
     private async Task UpdateCache(T entity)
     {
-        var type = typeof(T);
+        var projectId = GetProjectId(entity);
         var id = entity.Id;
 
-        // Update primary cache
-        await cache.SetAsync($"{type.Name}:{id}", entity);
+        // Update primary cache with project-scoped key
+        var cacheKey = GetCacheKey(id, projectId);
+        await cache.SetAsync(cacheKey, entity);
 
         // Update mapping cache if entity has a key
         if (entity is IHasKey keyedEntity)
         {
             var key = keyedEntity.Key;
             if (!string.IsNullOrEmpty(key))
-                await cache.SetAsync($"{type.Name}:mapping:{key}", id);
+            {
+                var mappingKey = GetKeyMappingCacheKey(key, projectId);
+                await cache.SetAsync(mappingKey, id);
+            }
         }
-
-        // Invalidate "all" cache as the collection has changed
-        await cache.RemoveAsync($"{type.Name}:all(null,null)");
-
-        // Invalidate all paged caches (pattern-based removal)
-        await InvalidatePagedCaches();
     }
 
     private async Task RemoveFromCache(Guid? id = null, T? entity = null)
     {
-        var type = typeof(T);
+        var projectId = GetProjectId(entity);
 
         // Remove from the primary cache
         if (entity != null)
@@ -99,18 +145,18 @@ public class CachedRepository<T>(IRepository<T> innerRepository, IFusionCache ca
             {
                 var key = keyedEntity.Key;
                 if (!string.IsNullOrEmpty(key))
-                    await cache.RemoveAsync($"{type.Name}:mapping:{key}");
+                {
+                    var mappingKey = GetKeyMappingCacheKey(key, projectId);
+                    await cache.RemoveAsync(mappingKey);
+                }
             }
         }
 
         if (id != null)
-            await cache.RemoveAsync($"{type.Name}:{id}");
-
-        // Invalidate "all" cache as the collection has changed
-        await cache.RemoveAsync($"{type.Name}:all(null,null)");
-
-        // Invalidate all paged caches
-        await InvalidatePagedCaches();
+        {
+            var cacheKey = GetCacheKey(id.Value, projectId);
+            await cache.RemoveAsync(cacheKey);
+        }
     }
 
     private async Task InvalidatePagedCaches()

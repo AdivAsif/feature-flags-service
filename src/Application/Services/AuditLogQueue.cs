@@ -19,7 +19,10 @@ public class AuditLogQueue
         });
     }
 
-    public Channel<AuditLogDTO> GetChannel() => _channel;
+    public Channel<AuditLogDTO> GetChannel()
+    {
+        return _channel;
+    }
 
     public async ValueTask QueueAuditLogAsync(AuditLogDTO auditLog)
     {

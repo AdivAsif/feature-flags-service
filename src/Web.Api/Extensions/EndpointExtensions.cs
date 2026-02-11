@@ -23,7 +23,13 @@ public static class EndpointExtensions
 
     public static IApplicationBuilder MapEndpoints(this WebApplication app)
     {
-        var endpoints = app.Services.GetRequiredService<IEnumerable<IEndpoint>>();
+        app.MapEndpoints(app.Services);
+        return app;
+    }
+
+    public static IEndpointRouteBuilder MapEndpoints(this IEndpointRouteBuilder app, IServiceProvider services)
+    {
+        var endpoints = services.GetRequiredService<IEnumerable<IEndpoint>>();
 
         foreach (var endpoint in endpoints)
             endpoint.MapEndpoint(app);

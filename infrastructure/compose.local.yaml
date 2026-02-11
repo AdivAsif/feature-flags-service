@@ -123,6 +123,30 @@ services:
     profiles:
       - load-test
     entrypoint: [ "/bin/sh", "-c", "exec k6 run --out json=/results/k6-results.json /scripts/k6-load-test.js" ]
+  
+  metabase:
+    image: metabase/metabase:latest
+    container_name: feature_flags_metabase
+    networks:
+      - feature-flags-network
+    ports:
+      - "3001:3000"
+    profiles:
+      - with-data-visualisation
+  
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: feature_flags_redis_insight
+    networks:
+      - feature-flags-network
+    ports:
+      - "5540:5540"
+    environment:
+      - RI_REDIS_HOST=redis
+      - RI_REDIS_PORT=6379
+      - RI_REDIS_ALIAS=Feature Flags Cache
+    profiles:
+      - with-data-visualisation
 
 networks:
   feature-flags-network:

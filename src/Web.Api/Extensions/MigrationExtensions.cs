@@ -21,4 +21,22 @@ public static class MigrationExtensions
             throw;
         }
     }
+
+    public static async Task SeedDatabaseAsync(this IServiceProvider serviceProvider)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<FeatureFlagsDbContext>();
+        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+        var seeder = new DbSeeder(dbContext, configuration);
+
+        try
+        {
+            await seeder.SeedAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"✗ Error seeding database: {ex.Message}");
+            throw;
+        }
+    }
 }

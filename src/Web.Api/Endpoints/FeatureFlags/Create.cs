@@ -11,19 +11,43 @@ public class Create : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPost("/feature-flags",
-            async (FeatureFlagDTO featureFlag, HttpContext httpContext, IFeatureFlagsService featureFlagsService,
+            async (FeatureFlagDTO featureFlag, HttpContext httpContext, ClaimsPrincipal user,
+                IFeatureFlagsService featureFlagsService,
                 ILogger<Create> logger) =>
             {
                 try
                 {
-                    logger.LogInformation("Creating feature flag with key: {Key}", featureFlag.Key);
+                    var projectId = user.GetProjectId();
+                    if (projectId == null)
+                    {
+                        logger.LogWarning("Request missing projectId claim");
+                        return Results.Unauthorized();
+                    }
+
+                    logger.LogInformation("Creating feature flag with key: {Key} for project: {ProjectId}",
+                        featureFlag.Key, projectId);
                     var performedByUserId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ??
                                             httpContext.User.FindFirstValue("sub");
                     var performedByUserEmail = httpContext.User.FindFirstValue(ClaimTypes.Email) ??
                                                httpContext.User.FindFirstValue("email");
 
+                    if (string.IsNullOrWhiteSpace(performedByUserId))
+                        performedByUserId = httpContext.User.FindFirstValue("apiKeyId");
+
+                    if (string.IsNullOrWhiteSpace(performedByUserEmail))
+                    {
+                        var apiKeyName = httpContext.User.FindFirstValue("apiKeyName");
+                        var apiKeyId = httpContext.User.FindFirstValue("apiKeyId") ?? performedByUserId;
+                        performedByUserEmail = !string.IsNullOrWhiteSpace(apiKeyName)
+                            ? $"apiKey:{apiKeyName}"
+                            : !string.IsNullOrWhiteSpace(apiKeyId)
+                                ? $"apiKey:{apiKeyId}"
+                                : null;
+                    }
+
                     var createdFeatureFlag =
-                        await featureFlagsService.CreateAsync(featureFlag, performedByUserId, performedByUserEmail);
+                        await featureFlagsService.CreateAsync(projectId.Value, featureFlag, performedByUserId,
+                            performedByUserEmail);
 
                     // Set ETag for the created resource
                     var etag = createdFeatureFlag.GenerateETag();

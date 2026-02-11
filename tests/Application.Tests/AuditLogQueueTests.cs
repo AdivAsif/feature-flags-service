@@ -74,11 +74,11 @@ public class AuditLogQueueTests
 
         // Assert
         var channel = _queue.GetChannel();
-        
+
         var success1 = channel.Reader.TryRead(out var queuedLog1);
         success1.Should().BeTrue();
         queuedLog1!.FeatureFlagId.Should().Be(auditLog1.FeatureFlagId);
-        
+
         var success2 = channel.Reader.TryRead(out var queuedLog2);
         success2.Should().BeTrue();
         queuedLog2!.FeatureFlagId.Should().Be(auditLog2.FeatureFlagId);

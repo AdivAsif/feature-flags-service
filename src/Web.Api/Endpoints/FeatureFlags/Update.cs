@@ -11,15 +11,23 @@ public class Update : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapPatch("/feature-flags/{key}",
-            async (string key, FeatureFlagDTO featureFlag, HttpContext httpContext,
+            async (string key, FeatureFlagDTO featureFlag, HttpContext httpContext, ClaimsPrincipal user,
                 IFeatureFlagsService featureFlagsService, ILogger<Update> logger) =>
             {
                 try
                 {
-                    logger.LogInformation("Updating feature flag with key: {Key}", key);
+                    var projectId = user.GetProjectId();
+                    if (projectId == null)
+                    {
+                        logger.LogWarning("Request missing projectId claim");
+                        return Results.Unauthorized();
+                    }
+
+                    logger.LogInformation("Updating feature flag with key: {Key} for project: {ProjectId}", key,
+                        projectId);
 
                     // Get the current feature flag to validate ETag
-                    var currentFeatureFlag = await featureFlagsService.GetByKeyAsync(key);
+                    var currentFeatureFlag = await featureFlagsService.GetByKeyAsync(projectId.Value, key);
                     if (currentFeatureFlag == null) return Results.NotFound($"Feature flag with key: {key} not found");
 
                     // Validate If-Match header if present
@@ -38,8 +46,23 @@ public class Update : IEndpoint
                     var performedByUserEmail = httpContext.User.FindFirstValue(ClaimTypes.Email) ??
                                                httpContext.User.FindFirstValue("email");
 
+                    if (string.IsNullOrWhiteSpace(performedByUserId))
+                        performedByUserId = httpContext.User.FindFirstValue("apiKeyId");
+
+                    if (string.IsNullOrWhiteSpace(performedByUserEmail))
+                    {
+                        var apiKeyName = httpContext.User.FindFirstValue("apiKeyName");
+                        var apiKeyId = httpContext.User.FindFirstValue("apiKeyId") ?? performedByUserId;
+                        performedByUserEmail = !string.IsNullOrWhiteSpace(apiKeyName)
+                            ? $"apiKey:{apiKeyName}"
+                            : !string.IsNullOrWhiteSpace(apiKeyId)
+                                ? $"apiKey:{apiKeyId}"
+                                : null;
+                    }
+
                     var updatedFeatureFlag =
-                        await featureFlagsService.UpdateAsync(key, featureFlag, performedByUserId, performedByUserEmail);
+                        await featureFlagsService.UpdateAsync(projectId.Value, key, featureFlag, performedByUserId,
+                            performedByUserEmail);
 
                     // Set ETag for the updated resource
                     var newETag = updatedFeatureFlag.GenerateETag();

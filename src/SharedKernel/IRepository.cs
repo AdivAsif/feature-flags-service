@@ -10,4 +10,5 @@ public interface IRepository<T> : IReadRepository<T> where T : EntityBase
 public interface IKeyedRepository<T> : IRepository<T> where T : EntityBase, IHasKey
 {
     Task<T?> GetByKeyAsync(string key);
+    Task<T?> GetByKeyAsync(Guid projectId, string key); // Multi-tenant version
 }

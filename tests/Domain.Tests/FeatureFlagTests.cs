@@ -60,8 +60,6 @@ public class FeatureFlagTests
     [InlineData(RuleType.Percentage)]
     [InlineData(RuleType.Group)]
     [InlineData(RuleType.User)]
-    [InlineData(RuleType.Tenant)]
-    [InlineData(RuleType.Environment)]
     public void RuleType_AllValues_ShouldBeValid(RuleType ruleType)
     {
         // Arrange

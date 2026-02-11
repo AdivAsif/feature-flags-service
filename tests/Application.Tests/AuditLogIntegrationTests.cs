@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Application.DTOs;
 using Application.Interfaces;
 using Application.Services;
@@ -12,6 +13,8 @@ namespace Application.Tests;
 
 public class AuditLogIntegrationTests
 {
+    private readonly Guid _testProjectId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
     [Fact]
     public async Task FeatureFlagCreate_ShouldQueueAuditLogWithoutBlocking()
     {
@@ -30,18 +33,19 @@ public class AuditLogIntegrationTests
             Parameters = Array.Empty<FeatureFlagParameters>()
         };
 
-        repository.GetByKeyAsync(dto.Key).Returns((FeatureFlag?)null);
+        repository.GetByKeyAsync(_testProjectId, dto.Key).Returns((FeatureFlag?)null);
         repository.CreateAsync(Arg.Any<FeatureFlag>()).Returns(call =>
         {
             var flag = call.Arg<FeatureFlag>();
             flag.Id = Guid.NewGuid();
+            flag.ProjectId = _testProjectId;
             flag.CreatedAt = DateTimeOffset.UtcNow;
             return flag;
         });
 
         // Act
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var result = await featureFlagsService.CreateAsync(dto, "user123", "user@example.com");
+        var stopwatch = Stopwatch.StartNew();
+        var result = await featureFlagsService.CreateAsync(_testProjectId, dto, "user123", "user@example.com");
         stopwatch.Stop();
 
         // Assert - Feature flag creation should be fast (not waiting for audit log)
@@ -73,6 +77,7 @@ public class AuditLogIntegrationTests
         var existingFlag = new FeatureFlag
         {
             Id = Guid.NewGuid(),
+            ProjectId = _testProjectId,
             Key = key,
             Description = "Old description",
             Enabled = false,
@@ -88,12 +93,12 @@ public class AuditLogIntegrationTests
             Parameters = Array.Empty<FeatureFlagParameters>()
         };
 
-        repository.GetByKeyAsync(key).Returns(existingFlag);
+        repository.GetByKeyAsync(_testProjectId, key).Returns(existingFlag);
         repository.UpdateAsync(Arg.Any<FeatureFlag>()).Returns(call => call.Arg<FeatureFlag>());
 
         // Act
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var result = await featureFlagsService.UpdateAsync(key, dto, "admin123", "admin@example.com");
+        var stopwatch = Stopwatch.StartNew();
+        var result = await featureFlagsService.UpdateAsync(_testProjectId, key, dto, "admin123", "admin@example.com");
         stopwatch.Stop();
 
         // Assert - Feature flag update should be fast (not waiting for audit log)
@@ -127,16 +132,17 @@ public class AuditLogIntegrationTests
         var featureFlag = new FeatureFlag
         {
             Id = id,
+            ProjectId = _testProjectId,
             Key = key,
             Enabled = true,
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        repository.GetByKeyAsync(key).Returns(featureFlag);
+        repository.GetByKeyAsync(_testProjectId, key).Returns(featureFlag);
 
         // Act
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        await featureFlagsService.DeleteByKeyAsync(key, "admin123", "admin@example.com");
+        var stopwatch = Stopwatch.StartNew();
+        await featureFlagsService.DeleteByKeyAsync(_testProjectId, key, "admin123", "admin@example.com");
         stopwatch.Stop();
 
         // Assert - Feature flag deletion should be fast (not waiting for audit log)
@@ -179,21 +185,24 @@ public class AuditLogIntegrationTests
             .Returns(x => Task.FromResult(x.Arg<AuditLogDTO>()));
 
         // Configure repository mocks
-        repository.GetByKeyAsync(Arg.Any<string>()).Returns((FeatureFlag?)null);
+        repository.GetByKeyAsync(Arg.Any<Guid>(), Arg.Any<string>()).Returns((FeatureFlag?)null);
         repository.CreateAsync(Arg.Any<FeatureFlag>()).Returns(call =>
         {
             var flag = call.Arg<FeatureFlag>();
             flag.Id = Guid.NewGuid();
+            flag.ProjectId = _testProjectId;
             flag.CreatedAt = DateTimeOffset.UtcNow;
             return flag;
         });
 
         // Act - Perform multiple feature flag operations
-        var dto1 = new FeatureFlagDTO { Key = "feature1", Enabled = true, Parameters = Array.Empty<FeatureFlagParameters>() };
-        var dto2 = new FeatureFlagDTO { Key = "feature2", Enabled = false, Parameters = Array.Empty<FeatureFlagParameters>() };
+        var dto1 = new FeatureFlagDTO
+            { Key = "feature1", Enabled = true, Parameters = Array.Empty<FeatureFlagParameters>() };
+        var dto2 = new FeatureFlagDTO
+            { Key = "feature2", Enabled = false, Parameters = Array.Empty<FeatureFlagParameters>() };
 
-        await featureFlagsService.CreateAsync(dto1, "user1", "user1@example.com");
-        await featureFlagsService.CreateAsync(dto2, "user2", "user2@example.com");
+        await featureFlagsService.CreateAsync(_testProjectId, dto1, "user1", "user1@example.com");
+        await featureFlagsService.CreateAsync(_testProjectId, dto2, "user2", "user2@example.com");
 
         // Start background service
         var cts = new CancellationTokenSource();
@@ -208,9 +217,7 @@ public class AuditLogIntegrationTests
 
         // Assert - Both audit logs should have been processed
         await auditLogsService.Received(2).AppendAsync(Arg.Any<AuditLogDTO>());
-        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogDTO>(
-            a => a.PerformedByUserId == "user1"));
-        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogDTO>(
-            a => a.PerformedByUserId == "user2"));
+        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogDTO>(a => a.PerformedByUserId == "user1"));
+        await auditLogsService.Received(1).AppendAsync(Arg.Is<AuditLogDTO>(a => a.PerformedByUserId == "user2"));
     }
 }

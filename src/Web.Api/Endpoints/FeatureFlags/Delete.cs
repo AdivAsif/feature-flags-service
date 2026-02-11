@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Application.Exceptions;
 using Application.Interfaces;
+using Web.Api.Extensions;
 
 namespace Web.Api.Endpoints.FeatureFlags;
 
@@ -9,18 +10,41 @@ public class Delete : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapDelete("/feature-flags/{key}",
-            async (string key, HttpContext httpContext, IFeatureFlagsService featureFlagsService,
+            async (string key, HttpContext httpContext, ClaimsPrincipal user, IFeatureFlagsService featureFlagsService,
                 ILogger<Delete> logger) =>
             {
                 try
                 {
-                    logger.LogInformation("Deleting feature flag with key: {Key}", key);
+                    var projectId = user.GetProjectId();
+                    if (projectId == null)
+                    {
+                        logger.LogWarning("Request missing projectId claim");
+                        return Results.Unauthorized();
+                    }
+
+                    logger.LogInformation("Deleting feature flag with key: {Key} for project: {ProjectId}", key,
+                        projectId);
                     var performedByUserId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ??
                                             httpContext.User.FindFirstValue("sub");
                     var performedByUserEmail = httpContext.User.FindFirstValue(ClaimTypes.Email) ??
                                                httpContext.User.FindFirstValue("email");
 
-                    await featureFlagsService.DeleteByKeyAsync(key, performedByUserId, performedByUserEmail);
+                    if (string.IsNullOrWhiteSpace(performedByUserId))
+                        performedByUserId = httpContext.User.FindFirstValue("apiKeyId");
+
+                    if (string.IsNullOrWhiteSpace(performedByUserEmail))
+                    {
+                        var apiKeyName = httpContext.User.FindFirstValue("apiKeyName");
+                        var apiKeyId = httpContext.User.FindFirstValue("apiKeyId") ?? performedByUserId;
+                        performedByUserEmail = !string.IsNullOrWhiteSpace(apiKeyName)
+                            ? $"apiKey:{apiKeyName}"
+                            : !string.IsNullOrWhiteSpace(apiKeyId)
+                                ? $"apiKey:{apiKeyId}"
+                                : null;
+                    }
+
+                    await featureFlagsService.DeleteByKeyAsync(projectId.Value, key, performedByUserId,
+                        performedByUserEmail);
                     return Results.NoContent();
                 }
                 catch (NotFoundException ex)

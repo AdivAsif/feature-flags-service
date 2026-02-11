@@ -1,4 +1,3 @@
-using Application.DTOs;
 using Application.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -8,9 +7,9 @@ namespace Application.Services;
 
 public class AuditLogBackgroundService : BackgroundService
 {
+    private readonly ILogger<AuditLogBackgroundService> _logger;
     private readonly AuditLogQueue _queue;
     private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<AuditLogBackgroundService> _logger;
 
     public AuditLogBackgroundService(
         AuditLogQueue queue,
@@ -28,7 +27,6 @@ public class AuditLogBackgroundService : BackgroundService
 
         var channel = _queue.GetChannel();
         await foreach (var auditLog in channel.Reader.ReadAllAsync(stoppingToken))
-        {
             try
             {
                 using var scope = _serviceProvider.CreateScope();
@@ -38,10 +36,9 @@ public class AuditLogBackgroundService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing audit log for FeatureFlagId: {FeatureFlagId}", 
+                _logger.LogError(ex, "Error processing audit log for FeatureFlagId: {FeatureFlagId}",
                     auditLog.FeatureFlagId);
             }
-        }
 
         _logger.LogInformation("Audit Log Background Service stopped");
     }
