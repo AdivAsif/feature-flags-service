@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialMigration : Migration
+    public partial class InitialCommit : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -20,8 +20,8 @@ namespace Infrastructure.Migrations
                     Action = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     PerformedByUserId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     PerformedByUserEmail = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    NewFeatureFlagState = table.Column<string>(type: "text", nullable: false),
-                    PreviousFeatureFlagState = table.Column<string>(type: "text", nullable: true),
+                    NewStateJson = table.Column<string>(type: "text", nullable: false),
+                    PreviousStateJson = table.Column<string>(type: "text", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
@@ -36,10 +36,10 @@ namespace Infrastructure.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Version = table.Column<int>(type: "integer", nullable: false),
-                    Key = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     Description = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: false),
                     Enabled = table.Column<bool>(type: "boolean", nullable: false),
                     Parameters = table.Column<string>(type: "text", nullable: false),
+                    Key = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },

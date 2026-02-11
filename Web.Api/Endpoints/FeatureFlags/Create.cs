@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Application.DTOs;
 using Application.Exceptions;
 using Application.Interfaces;
@@ -16,7 +17,13 @@ public class Create : IEndpoint
                 try
                 {
                     logger.LogInformation("Creating feature flag with key: {Key}", featureFlag.Key);
-                    var createdFeatureFlag = await featureFlagsService.CreateAsync(featureFlag);
+                    var performedByUserId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ??
+                                            httpContext.User.FindFirstValue("sub");
+                    var performedByUserEmail = httpContext.User.FindFirstValue(ClaimTypes.Email) ??
+                                               httpContext.User.FindFirstValue("email");
+
+                    var createdFeatureFlag =
+                        await featureFlagsService.CreateAsync(featureFlag, performedByUserId, performedByUserEmail);
 
                     // Set ETag for the created resource
                     var etag = createdFeatureFlag.GenerateETag();

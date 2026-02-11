@@ -34,10 +34,11 @@ public static class EndpointExtensions
     public static EvaluationContext ToEvaluationContext(this ClaimsPrincipal user)
     {
         var userId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        var email = user.FindFirstValue(ClaimTypes.Email) ?? string.Empty;
         var groups = user.FindAll("group").Select(c => c.Value).ToList();
         var tenantId = user.FindFirstValue("tenant_id");
         var environment = user.FindFirstValue("environment");
 
-        return new EvaluationContext(userId, groups, tenantId, environment);
+        return new EvaluationContext(userId, email, groups, tenantId, environment);
     }
 }

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Application.Exceptions;
 using Application.Interfaces;
 
@@ -8,12 +9,18 @@ public class Delete : IEndpoint
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         app.MapDelete("/feature-flags/{key}",
-            async (string key, IFeatureFlagsService featureFlagsService, ILogger<Delete> logger) =>
+            async (string key, HttpContext httpContext, IFeatureFlagsService featureFlagsService,
+                ILogger<Delete> logger) =>
             {
                 try
                 {
                     logger.LogInformation("Deleting feature flag with key: {Key}", key);
-                    await featureFlagsService.DeleteByKeyAsync(key);
+                    var performedByUserId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ??
+                                            httpContext.User.FindFirstValue("sub");
+                    var performedByUserEmail = httpContext.User.FindFirstValue(ClaimTypes.Email) ??
+                                               httpContext.User.FindFirstValue("email");
+
+                    await featureFlagsService.DeleteByKeyAsync(key, performedByUserId, performedByUserEmail);
                     return Results.NoContent();
                 }
                 catch (NotFoundException ex)

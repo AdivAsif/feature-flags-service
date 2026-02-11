@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Infrastructure.Data;
 
@@ -32,7 +33,7 @@ public class FeatureFlagsDbContext(DbContextOptions<FeatureFlagsDbContext> optio
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.FeatureFlagId).IsRequired();
-            entity.Property(e => e.Action).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Action).IsRequired().HasMaxLength(50).HasConversion(new EnumToStringConverter<AuditLogAction>());
             entity.Property(e => e.PerformedByUserId).IsRequired().HasMaxLength(100);
             entity.Property(e => e.PerformedByUserEmail).IsRequired().HasMaxLength(100);
             // entity.Property(e => e.NewFeatureFlagState).HasConversion(s =>

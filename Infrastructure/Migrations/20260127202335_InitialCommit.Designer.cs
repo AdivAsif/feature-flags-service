@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(FeatureFlagsDbContext))]
-    [Migration("20260118211149_InitialMigration")]
-    partial class InitialMigration
+    [Migration("20260127202335_InitialCommit")]
+    partial class InitialCommit
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -42,7 +42,7 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("FeatureFlagId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("NewFeatureFlagState")
+                    b.Property<string>("NewStateJson")
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -56,7 +56,8 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<string>("PreviousFeatureFlagState")
+                    b.Property<string>("PreviousStateJson")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<DateTimeOffset?>("UpdatedAt")

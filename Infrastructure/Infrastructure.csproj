@@ -23,6 +23,7 @@
 
     <ItemGroup>
         <Folder Include="Authentication\"/>
+        <Folder Include="Migrations\" />
     </ItemGroup>
 
     <ItemGroup>

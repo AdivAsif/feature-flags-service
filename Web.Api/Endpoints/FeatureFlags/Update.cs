@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Application.DTOs;
 using Application.Exceptions;
 using Application.Interfaces;
@@ -32,7 +33,13 @@ public class Update : IEndpoint
                         }
                     }
 
-                    var updatedFeatureFlag = await featureFlagsService.UpdateAsync(key, featureFlag);
+                    var performedByUserId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ??
+                                            httpContext.User.FindFirstValue("sub");
+                    var performedByUserEmail = httpContext.User.FindFirstValue(ClaimTypes.Email) ??
+                                               httpContext.User.FindFirstValue("email");
+
+                    var updatedFeatureFlag =
+                        await featureFlagsService.UpdateAsync(key, featureFlag, performedByUserId, performedByUserEmail);
 
                     // Set ETag for the updated resource
                     var newETag = updatedFeatureFlag.GenerateETag();
