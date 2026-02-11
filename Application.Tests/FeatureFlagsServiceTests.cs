@@ -12,13 +12,15 @@ namespace Application.Tests;
 public class FeatureFlagsServiceTests
 {
     private readonly IKeyedRepository<FeatureFlag> _repository;
+    private readonly IAuditLogsService _auditLogService;
     private readonly IFeatureFlagsService _service;
 
     public FeatureFlagsServiceTests()
     {
         _repository = Substitute.For<IKeyedRepository<FeatureFlag>>();
+        _auditLogService = Substitute.For<IAuditLogsService>();
         var mapper = new FeatureFlagMapper();
-        _service = new FeatureFlagsService(_repository, mapper);
+        _service = new FeatureFlagsService(_repository, mapper, _auditLogService);
     }
 
     #region GetAllAsync Tests

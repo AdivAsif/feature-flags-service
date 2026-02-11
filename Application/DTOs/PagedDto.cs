@@ -1,8 +1,8 @@
 namespace Application.DTOs;
 
-public class PagedFeatureFlagDTO
+public class PagedDto<T>
 {
-    public IEnumerable<FeatureFlagDTO> Items { get; set; } = [];
+    public IEnumerable<T> Items { get; set; } = [];
     public PaginationInfo PageInfo { get; set; } = new();
 }
 

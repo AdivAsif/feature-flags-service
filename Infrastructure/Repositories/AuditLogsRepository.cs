@@ -7,7 +7,7 @@ namespace Infrastructure.Repositories;
 
 public class AuditLogsRepository(FeatureFlagsDbContext dbContext) : IRepository<AuditLog>
 {
-        // GET
+    // GET
     public async Task<AuditLog?> GetByIdAsync(Guid id)
     {
         return await dbContext.AuditLogs.FindAsync(id);
@@ -57,7 +57,7 @@ public class AuditLogsRepository(FeatureFlagsDbContext dbContext) : IRepository<
             Items = items,
             PageInfo = new PageInfo
             {
-                HasNextPage = !string.IsNullOrWhiteSpace(before) ? false : hasNextPage,
+                HasNextPage = string.IsNullOrWhiteSpace(before) && hasNextPage,
                 HasPreviousPage = hasPreviousPage,
                 StartCursor = startCursor,
                 EndCursor = endCursor,
@@ -78,7 +78,6 @@ public class AuditLogsRepository(FeatureFlagsDbContext dbContext) : IRepository<
     public async Task<AuditLog> UpdateAsync(AuditLog auditLog)
     {
         dbContext.Entry(auditLog).State = EntityState.Modified;
-        // dbContext.FeatureFlags.Update(featureFlag);
         await dbContext.SaveChangesAsync();
         return auditLog;
     }

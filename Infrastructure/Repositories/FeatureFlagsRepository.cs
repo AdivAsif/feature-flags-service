@@ -62,7 +62,7 @@ public sealed class FeatureFlagsRepository(FeatureFlagsDbContext dbContext) : IK
             Items = items,
             PageInfo = new PageInfo
             {
-                HasNextPage = !string.IsNullOrWhiteSpace(before) ? false : hasNextPage,
+                HasNextPage = string.IsNullOrWhiteSpace(before) && hasNextPage,
                 HasPreviousPage = hasPreviousPage,
                 StartCursor = startCursor,
                 EndCursor = endCursor,
