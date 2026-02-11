@@ -35,14 +35,14 @@ public class FeatureFlagsDbContext(DbContextOptions<FeatureFlagsDbContext> optio
             entity.Property(e => e.Action).IsRequired().HasMaxLength(50);
             entity.Property(e => e.PerformedByUserId).IsRequired().HasMaxLength(100);
             entity.Property(e => e.PerformedByUserEmail).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.NewFeatureFlagState).HasConversion(s =>
-                    JsonSerializer.Serialize(s, (JsonSerializerOptions?)null),
-                s => JsonSerializer.Deserialize<FeatureFlag>(s, (JsonSerializerOptions?)null) ??
-                     new FeatureFlag()).IsRequired();
-            entity.Property(e => e.PreviousFeatureFlagState).IsRequired(false).HasConversion(s =>
-                    JsonSerializer.Serialize(s, (JsonSerializerOptions?)null),
-                s => JsonSerializer.Deserialize<FeatureFlag>(s, (JsonSerializerOptions?)null) ??
-                     null);
+            // entity.Property(e => e.NewFeatureFlagState).HasConversion(s =>
+            //         JsonSerializer.Serialize(s, (JsonSerializerOptions?)null),
+            //     s => JsonSerializer.Deserialize<FeatureFlag>(s, (JsonSerializerOptions?)null) ??
+            //          new FeatureFlag()).IsRequired();
+            // entity.Property(e => e.PreviousFeatureFlagState).IsRequired(false).HasConversion(s =>
+            //         JsonSerializer.Serialize(s, (JsonSerializerOptions?)null),
+            //     s => JsonSerializer.Deserialize<FeatureFlag>(s, (JsonSerializerOptions?)null) ??
+            //          null);
             entity.HasIndex(e => e.CreatedAt);
         });
     }

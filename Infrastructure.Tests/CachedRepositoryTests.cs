@@ -10,14 +10,14 @@ namespace Infrastructure.Tests;
 public class CachedRepositoryTests
 {
     private readonly IFusionCache _cache;
-    private readonly CachedRepository<FeatureFlag> _cachedRepository;
-    private readonly IRepository<FeatureFlag> _innerRepository;
+    private readonly CachedKeyedRepository<FeatureFlag> _cachedRepository;
+    private readonly IKeyedRepository<FeatureFlag> _innerRepository;
 
     public CachedRepositoryTests()
     {
-        _innerRepository = Substitute.For<IRepository<FeatureFlag>>();
+        _innerRepository = Substitute.For<IKeyedRepository<FeatureFlag>>();
         _cache = Substitute.For<IFusionCache>();
-        _cachedRepository = new CachedRepository<FeatureFlag>(_innerRepository, _cache);
+        _cachedRepository = new CachedKeyedRepository<FeatureFlag>(_innerRepository, _cache);
     }
 
     #region GetByIdAsync Tests

@@ -33,12 +33,13 @@ builder.Services.AddOpenApi();
 builder.Services.AddNpgsql<FeatureFlagsDbContext>(builder.Configuration.GetConnectionString("FeatureFlagsDatabase") ??
                                                   throw new InvalidOperationException(
                                                       "Connection string 'FeatureFlagsDatabase' not found."));
-builder.Services.AddScoped<IRepository<FeatureFlag>, FeatureFlagsRepository>();
+builder.Services.AddScoped<IKeyedRepository<FeatureFlag>, FeatureFlagsRepository>();
+builder.Services.AddScoped<IRepository<AuditLog>, AuditLogsRepository>();
 builder.Services.AddSingleton<FeatureFlagMapper>();
 builder.Services.AddScoped<IFeatureFlagsService, FeatureFlagsService>();
 builder.Services.AddScoped<IEvaluationService, EvaluationService>();
 builder.Services.AddEndpoints(typeof(Program).Assembly);
-builder.Services.Decorate(typeof(IRepository<>), typeof(CachedRepository<>));
+builder.Services.Decorate<IKeyedRepository<FeatureFlag>, CachedKeyedRepository<FeatureFlag>>();
 builder.Services.AddMemoryCache();
 builder.Services.AddFusionCache()
     .WithOptions(options =>

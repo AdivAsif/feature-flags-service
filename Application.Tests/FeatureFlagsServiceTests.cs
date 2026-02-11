@@ -11,12 +11,12 @@ namespace Application.Tests;
 
 public class FeatureFlagsServiceTests
 {
-    private readonly IRepository<FeatureFlag> _repository;
+    private readonly IKeyedRepository<FeatureFlag> _repository;
     private readonly IFeatureFlagsService _service;
 
     public FeatureFlagsServiceTests()
     {
-        _repository = Substitute.For<IRepository<FeatureFlag>>();
+        _repository = Substitute.For<IKeyedRepository<FeatureFlag>>();
         var mapper = new FeatureFlagMapper();
         _service = new FeatureFlagsService(_repository, mapper);
     }

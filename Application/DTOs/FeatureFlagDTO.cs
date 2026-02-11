@@ -1,18 +1,16 @@
 ﻿using Domain;
 using Riok.Mapperly.Abstractions;
+using SharedKernel;
 
 namespace Application.DTOs;
 
-public sealed class FeatureFlagDTO
+public sealed class FeatureFlagDTO : DtoBase
 {
-    public Guid Id { get; set; } = Guid.Empty;
     public int Version { get; set; } = 1;
     public string Key { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public bool Enabled { get; set; }
     public FeatureFlagParameters[] Parameters { get; set; } = [];
-    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-    public DateTimeOffset? UpdatedAt { get; set; }
 }
 
 [Mapper]

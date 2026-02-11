@@ -6,7 +6,7 @@ using SharedKernel;
 
 namespace Application.Services;
 
-public sealed class EvaluationService(IRepository<FeatureFlag> featureFlagRepository) : IEvaluationService
+public sealed class EvaluationService(IKeyedRepository<FeatureFlag> featureFlagRepository) : IEvaluationService
 {
     public async Task<EvaluationResultDTO> EvaluateAsync(string featureFlagKey, EvaluationContext context)
     {

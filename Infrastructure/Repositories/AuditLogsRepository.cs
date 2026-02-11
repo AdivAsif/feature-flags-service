@@ -5,30 +5,25 @@ using SharedKernel;
 
 namespace Infrastructure.Repositories;
 
-public sealed class FeatureFlagsRepository(FeatureFlagsDbContext dbContext) : IKeyedRepository<FeatureFlag>
+public class AuditLogsRepository(FeatureFlagsDbContext dbContext) : IRepository<AuditLog>
 {
-    // GET
-    public async Task<FeatureFlag?> GetByIdAsync(Guid id)
+        // GET
+    public async Task<AuditLog?> GetByIdAsync(Guid id)
     {
-        return await dbContext.FeatureFlags.FindAsync(id);
+        return await dbContext.AuditLogs.FindAsync(id);
     }
 
-    public async Task<FeatureFlag?> GetByKeyAsync(string key)
+    public async Task<IEnumerable<AuditLog>> GetAllAsync(int? take, int? skip)
     {
-        return await dbContext.FeatureFlags.AsNoTracking().FirstOrDefaultAsync(ff => ff.Key == key);
+        return await dbContext.AuditLogs.AsNoTracking().ToListAsync();
     }
 
-    public async Task<IEnumerable<FeatureFlag>> GetAllAsync(int? take, int? skip)
-    {
-        return await dbContext.FeatureFlags.AsNoTracking().ToListAsync();
-    }
-
-    public async Task<PagedResult<FeatureFlag>> GetPagedAsync(int first = 10, string? after = null,
+    public async Task<PagedResult<AuditLog>> GetPagedAsync(int first = 10, string? after = null,
         string? before = null)
     {
         first = Math.Clamp(first, 1, 100);
 
-        var query = dbContext.FeatureFlags.AsNoTracking().OrderBy(ff => ff.CreatedAt).ThenBy(ff => ff.Id);
+        var query = dbContext.AuditLogs.AsNoTracking().OrderBy(ff => ff.CreatedAt).ThenBy(ff => ff.Id);
 
         if (!string.IsNullOrWhiteSpace(after) &&
             CursorHelper.TryDecodeCursor(after, out var afterId, out var afterCreatedAt))
@@ -50,14 +45,14 @@ public sealed class FeatureFlagsRepository(FeatureFlagsDbContext dbContext) : IK
 
         if (!string.IsNullOrWhiteSpace(before)) items.Reverse();
 
-        var totalCount = await dbContext.FeatureFlags.CountAsync();
+        var totalCount = await dbContext.AuditLogs.CountAsync();
 
         var startCursor = items.Count > 0 ? CursorHelper.EncodeCursor(items.First().Id, items.First().CreatedAt) : null;
         var endCursor = items.Count > 0 ? CursorHelper.EncodeCursor(items.Last().Id, items.Last().CreatedAt) : null;
 
         var hasPreviousPage = !string.IsNullOrWhiteSpace(after) || (!string.IsNullOrWhiteSpace(before) && hasNextPage);
 
-        return new PagedResult<FeatureFlag>
+        return new PagedResult<AuditLog>
         {
             Items = items,
             PageInfo = new PageInfo
@@ -72,28 +67,28 @@ public sealed class FeatureFlagsRepository(FeatureFlagsDbContext dbContext) : IK
     }
 
     // CREATE
-    public async Task<FeatureFlag> CreateAsync(FeatureFlag featureFlag)
+    public async Task<AuditLog> CreateAsync(AuditLog auditLog)
     {
-        await dbContext.FeatureFlags.AddAsync(featureFlag);
+        await dbContext.AuditLogs.AddAsync(auditLog);
         await dbContext.SaveChangesAsync();
-        return featureFlag;
+        return auditLog;
     }
 
     // UPDATE
-    public async Task<FeatureFlag> UpdateAsync(FeatureFlag featureFlag)
+    public async Task<AuditLog> UpdateAsync(AuditLog auditLog)
     {
-        dbContext.Entry(featureFlag).State = EntityState.Modified;
+        dbContext.Entry(auditLog).State = EntityState.Modified;
         // dbContext.FeatureFlags.Update(featureFlag);
         await dbContext.SaveChangesAsync();
-        return featureFlag;
+        return auditLog;
     }
 
     // DELETE
     public async Task DeleteAsync(Guid id)
     {
-        var featureFlag = await dbContext.FeatureFlags.FindAsync(id);
-        if (featureFlag == null) return;
-        dbContext.FeatureFlags.Remove(featureFlag);
+        var auditLog = await dbContext.AuditLogs.FindAsync(id);
+        if (auditLog == null) return;
+        dbContext.AuditLogs.Remove(auditLog);
         await dbContext.SaveChangesAsync();
     }
 }

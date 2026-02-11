@@ -6,7 +6,7 @@ using SharedKernel;
 
 namespace Application.Services;
 
-public sealed class FeatureFlagsService(IRepository<FeatureFlag> featureFlagRepository, FeatureFlagMapper mapper)
+public sealed class FeatureFlagsService(IKeyedRepository<FeatureFlag> featureFlagRepository, FeatureFlagMapper mapper)
     : IFeatureFlagsService
 {
     public async Task<FeatureFlagDTO?> GetAsync(Guid id)

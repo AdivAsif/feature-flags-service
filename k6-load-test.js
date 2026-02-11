@@ -89,10 +89,10 @@ export function setup() {
 
         if (devTokenResponse.status === 200) {
             const body = JSON.parse(devTokenResponse.body);
-            console.log('✓ Auth token obtained successfully');
+            console.log('Auth token obtained successfully');
             return {token: body.token};
         } else {
-            console.log(`✗ Failed to get auth token. Status: ${devTokenResponse.status}`);
+            console.log(`Failed to get auth token. Status: ${devTokenResponse.status}`);
             console.log(`Response: ${devTokenResponse.body}`);
             throw new Error('Failed to obtain auth token');
         }

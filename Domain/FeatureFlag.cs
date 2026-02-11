@@ -3,7 +3,7 @@ using SharedKernel;
 
 namespace Domain;
 
-public sealed class FeatureFlag : EntityBase, IHasKey
+public sealed class FeatureFlag : EntityBase, IHasKey, ICacheable
 {
     public int Version { get; set; } = 1; // version is an integer for optimistic concurrency control (OCC)
     [MaxLength(255)] public string Description { get; set; } = string.Empty;
