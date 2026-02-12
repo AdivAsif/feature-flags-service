@@ -8,6 +8,7 @@
         <NoWarn>$(NoWarn);1591</NoWarn>
 
         <PackageId>FeatureFlags.Client</PackageId>
+        <Version>1.0.1</Version>
         <Title>FeatureFlags.Client</Title>
         <Description>Lightweight .NET client SDK for the Feature Flags Service.</Description>
         <PackageTags>feature-flags;featureflag;flags;toggle;sdk</PackageTags>

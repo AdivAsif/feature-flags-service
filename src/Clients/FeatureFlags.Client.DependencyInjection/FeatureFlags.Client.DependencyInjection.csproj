@@ -8,6 +8,7 @@
         <NoWarn>$(NoWarn);1591</NoWarn>
 
         <PackageId>FeatureFlags.Client.DependencyInjection</PackageId>
+        <Version>1.0.1</Version>
         <Title>FeatureFlags.Client.DependencyInjection</Title>
         <Description>Microsoft.Extensions.DependencyInjection helpers for FeatureFlags.Client.</Description>
         <PackageTags>feature-flags;featureflag;flags;toggle;sdk;di</PackageTags>

@@ -4,6 +4,14 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <Version>1.0.1</Version>
+
+        <PackageId>FeatureFlags.Contracts</PackageId>
+        <Title>FeatureFlags.Contracts</Title>
+        <Description>Contracts for the .NET client SDK for the Feature Flags Service.</Description>
+        <PackageTags>feature-flags;featureflag;flags;toggle;sdk;contracts</PackageTags>
+        <Configurations>Debug;Release;Production</Configurations>
+        <Platforms>AnyCPU</Platforms>
     </PropertyGroup>
 
     <ItemGroup>

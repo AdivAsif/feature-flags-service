@@ -55,30 +55,46 @@ maintainability and scalability of the codebase.
 
 ```mermaid
 flowchart TB
-    client["CLIENT (SDK)\nAPI Key: ffsk_live_xxx"] --> web["WEB API LAYER"]
+    client["CLIENT (SDK)
+    API Key: ffsk_live_xxx"] --> web["WEB API LAYER"]
 
     subgraph web["WEB API LAYER"]
-        auth["Authentication Middleware\n• Checks X-Api-Key header\n• Validates API key (hash, expiration, revocation)\n• Extracts projectId → adds to Claims"]
-        endpoints["Endpoints\n• Extract projectId from user.GetProjectId()\n• Pass projectId to services"]
+        auth["Authentication Middleware
+        • Checks X-Api-Key header
+        • Validates API key (hash, expiration, revocation)
+        • Extracts projectId → adds to Claims"]
+        endpoints["Endpoints
+        • Extract projectId from user.GetProjectId()
+        • Pass projectId to services"]
         auth --> endpoints
     end
 
     web --> app["APPLICATION LAYER"]
 
     subgraph app["APPLICATION LAYER"]
-        services["Services (Business Logic)\n• IFeatureFlagsService\n• IEvaluationService\n• IProjectService\n• IApiKeyService"]
+        services["Services (Business Logic)
+        • IFeatureFlagsService
+        • IEvaluationService
+        • IProjectService
+        • IApiKeyService"]
     end
 
     app --> infra["INFRASTRUCTURE LAYER"]
 
     subgraph infra["INFRASTRUCTURE LAYER"]
-        repos["Repositories\n• Filter by projectId in queries\n• ProjectRepository, ApiKeyRepository\n• FeatureFlagsRepository"]
+        repos["Repositories
+        • Filter by projectId in queries
+        • ProjectRepository, ApiKeyRepository
+        • FeatureFlagsRepository"]
     end
 
     infra --> domain["DOMAIN LAYER"]
 
     subgraph domain["DOMAIN LAYER"]
-        entities["Entities\n• Project (id, name, description)\n• ApiKey (projectId, keyHash, scopes, expires)\n• FeatureFlag"]
+        entities["Entities
+        • Project (id, name, description)
+        • ApiKey (projectId, keyHash, scopes, expires)
+        • FeatureFlag"]
     end
 
     domain --> db["DATABASE / CACHE LAYER"]
