@@ -6,15 +6,16 @@
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <NoWarn>$(NoWarn);1591</NoWarn>
+        <IsPackable>true</IsPackable>
 
         <PackageId>FeatureFlags.Client</PackageId>
-        <Version>1.0.1</Version>
         <Title>FeatureFlags.Client</Title>
         <Description>Lightweight .NET client SDK for the Feature Flags Service.</Description>
         <PackageTags>feature-flags;featureflag;flags;toggle;sdk</PackageTags>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <Configurations>Debug;Release;Production</Configurations>
         <Platforms>AnyCPU</Platforms>
+        <PackageProjectUrl>https://github.com/AdivAsif/feature-flags-service</PackageProjectUrl>
     </PropertyGroup>
 
     <ItemGroup>

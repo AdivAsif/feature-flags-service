@@ -6,9 +6,9 @@
         <Nullable>enable</Nullable>
         <Configurations>Debug;Release;Production</Configurations>
         <Platforms>AnyCPU</Platforms>
+        <IsPackable>true</IsPackable>
 
         <PackageId>FeatureFlags.Domain</PackageId>
-        <Version>1.0.1</Version>
         <Title>FeatureFlags.Domain</Title>
         <Description>Domain for the .NET client SDK for the Feature Flags Service.</Description>
         <PackageTags>feature-flags;featureflag;flags;toggle;sdk;domain</PackageTags>

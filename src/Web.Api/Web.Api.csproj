@@ -7,7 +7,7 @@
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
         <Configurations>Debug;Release;Production</Configurations>
         <Platforms>AnyCPU</Platforms>
-        <UserSecretsId>4a5a30b2-8089-43d4-8741-f1b5fce07cdf</UserSecretsId>
+        <IsPackable>false</IsPackable>
     </PropertyGroup>
 
     <ItemGroup>
