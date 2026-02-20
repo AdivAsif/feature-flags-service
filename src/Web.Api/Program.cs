@@ -122,7 +122,7 @@ builder.Services.AddScoped<IEvaluationService, EvaluationService>();
 builder.Services.Decorate<IFeatureFlagRepository, CachedFeatureFlagRepository>();
 builder.Services.Decorate<IProjectRepository, CachedProjectRepository>();
 builder.Services.Decorate<IApiKeyRepository, CachedApiKeyRepository>();
-builder.Services.Decorate<IEvaluationService, CachedEvaluationService>();
+// builder.Services.Decorate<IEvaluationService, CachedEvaluationService>();
 
 builder.Services.AddScoped<IAuditLogsService, AuditLogsService>();
 builder.Services.AddSingleton<AuditLogQueue>();
@@ -241,16 +241,9 @@ builder.Services.AddAuthorizationBuilder()
             JwtBearerDefaults.AuthenticationScheme,
             ApiKeyAuthenticationOptions.DefaultScheme);
         policy.RequireAssertion(context =>
-        {
-            // API Key with read scope
-            var hasReadScope = context.User.HasClaim(c =>
-                c.Type == "scope" && c.Value.Split(' ').Contains("flags:read"));
-
-            // JWT with user or admin role
-            var isUserOrAdmin = context.User.IsInRole("user") || context.User.IsInRole("admin");
-
-            return hasReadScope || isUserOrAdmin;
-        });
+            context.User.HasClaim("scope", "flags:read") || 
+            context.User.IsInRole("user") || 
+            context.User.IsInRole("admin"));
     })
     .AddPolicy("WriteAccess", policy =>
     {
@@ -258,16 +251,8 @@ builder.Services.AddAuthorizationBuilder()
             JwtBearerDefaults.AuthenticationScheme,
             ApiKeyAuthenticationOptions.DefaultScheme);
         policy.RequireAssertion(context =>
-        {
-            // API Key with write scope
-            var hasWriteScope = context.User.HasClaim(c =>
-                c.Type == "scope" && c.Value.Split(' ').Contains("flags:write"));
-
-            // JWT with admin role
-            var isAdmin = context.User.IsInRole("admin");
-
-            return hasWriteScope || isAdmin;
-        });
+            context.User.HasClaim("scope", "flags:write") || 
+            context.User.IsInRole("admin"));
     })
     .AddPolicy("DeleteAccess", policy =>
     {
@@ -275,23 +260,13 @@ builder.Services.AddAuthorizationBuilder()
             JwtBearerDefaults.AuthenticationScheme,
             ApiKeyAuthenticationOptions.DefaultScheme);
         policy.RequireAssertion(context =>
-        {
-            // API Key with delete scope
-            var hasDeleteScope = context.User.HasClaim(c =>
-                c.Type == "scope" && c.Value.Split(' ').Contains("flags:delete"));
-
-            // JWT with admin role
-            var isAdmin = context.User.IsInRole("admin");
-
-            return hasDeleteScope || isAdmin;
-        });
+            context.User.HasClaim("scope", "flags:delete") || 
+            context.User.IsInRole("admin"));
     })
     .AddPolicy("EvaluateAccess", policy =>
     {
         policy.AddAuthenticationSchemes(ApiKeyAuthenticationOptions.DefaultScheme);
-        policy.RequireAssertion(context =>
-            context.User.HasClaim(c =>
-                c.Type == "scope" && c.Value.Split(' ').Contains("flags:read")));
+        policy.RequireAssertion(context => context.User.HasClaim("scope", "flags:read"));
     });
 builder.Services.AddHealthChecks();
 builder.Services.AddOpenTelemetry()

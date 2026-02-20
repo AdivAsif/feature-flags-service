@@ -27,7 +27,7 @@ public class ApiKeyAuthenticationHandler(
 {
     private static readonly FusionCacheEntryOptions AuthCacheOptions = new()
     {
-        Duration = TimeSpan.FromMinutes(1),
+        Duration = TimeSpan.FromMinutes(10),
         Size = 1,
         SkipDistributedCacheRead = true,
         SkipDistributedCacheWrite = true

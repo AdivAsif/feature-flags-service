@@ -17,9 +17,6 @@ public sealed class EvaluationService(IFeatureFlagRepository featureFlagReposito
         if (string.IsNullOrWhiteSpace(featureFlagKey))
             throw new BadRequestException("Feature flag key cannot be null or whitespace");
 
-        if (context is null)
-            throw new BadRequestException("Evaluation context cannot be null");
-
         if (string.IsNullOrWhiteSpace(context.UserId))
             throw new BadRequestException("User ID cannot be null or whitespace");
 

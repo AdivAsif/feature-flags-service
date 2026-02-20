@@ -59,8 +59,7 @@ public class Evaluate : IEndpoint
 
     private static List<string> ParseGroups(string groups)
     {
-        if (string.IsNullOrWhiteSpace(groups))
-            return [];
+        if (string.IsNullOrWhiteSpace(groups)) return [];
 
         // Initial capacity of 4 to handle most scenarios without resizing
         var result = new List<string>(4);
@@ -71,7 +70,7 @@ public class Evaluate : IEndpoint
             var commaIndex = span.IndexOf(',');
             ReadOnlySpan<char> groupSpan;
 
-            if (commaIndex == -1)
+            if (commaIndex < 0)
             {
                 groupSpan = span;
                 span = ReadOnlySpan<char>.Empty;
@@ -84,13 +83,8 @@ public class Evaluate : IEndpoint
 
             // Trim whitespace manually to avoid allocation
             groupSpan = groupSpan.Trim();
-
             if (groupSpan.IsEmpty) continue;
-            // Only allocate string here
-            var group = groupSpan.ToString().ToUpperInvariant();
-
-            if (!result.Contains(group))
-                result.Add(group);
+            result.Add(groupSpan.ToString());
         }
 
         return result;

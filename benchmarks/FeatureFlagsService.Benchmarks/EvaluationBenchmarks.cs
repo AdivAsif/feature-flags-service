@@ -12,14 +12,14 @@ namespace FeatureFlagsService.Benchmarks;
 public class EvaluationBenchmarks
 {
     private readonly Guid _projectId = Guid.NewGuid();
-    private EvaluationContext _groupMatchContext = null!;
+    private EvaluationContext _groupMatchContext;
     private FeatureFlag _groupMatchFlag = null!;
-    private EvaluationContext _groupMissContext = null!;
+    private EvaluationContext _groupMissContext;
     private FeatureFlag _groupMissFlag = null!;
-    private EvaluationContext _percentageContext = null!;
+    private EvaluationContext _percentageContext;
     private FeatureFlag _percentageFlag = null!;
     private EvaluationService _service = null!;
-    private EvaluationContext _userMatchContext = null!;
+    private EvaluationContext _userMatchContext;
     private FeatureFlag _userTargetFlag = null!;
 
     [GlobalSetup]
