@@ -94,6 +94,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeatureFlags.Sample.Blazor", "samples\FeatureFlags.Sample.Blazor\FeatureFlags.Sample.Blazor.csproj", "{203C7126-257F-4987-9583-ABA1F6767EC2}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "adr", "adr", "{29CEF764-373F-4525-95F0-78934F00848D}"
+	ProjectSection(SolutionItems) = preProject
+		docs\adr\0001-initial-architecture.md = docs\adr\0001-initial-architecture.md
+		docs\adr\0002-move-to-computed-evaluations.md = docs\adr\0002-move-to-computed-evaluations.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

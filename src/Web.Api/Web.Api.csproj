@@ -8,6 +8,8 @@
         <Configurations>Debug;Release;Production</Configurations>
         <Platforms>AnyCPU</Platforms>
         <IsPackable>false</IsPackable>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <UserSecretsId>99faea86-c246-4a50-81d7-ccf080f36d47</UserSecretsId>
     </PropertyGroup>
 
     <ItemGroup>

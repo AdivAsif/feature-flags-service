@@ -1,23 +1,23 @@
 <Project>
-  <PropertyGroup>
-    <Version>1.0.2</Version>
-  </PropertyGroup>
+    <PropertyGroup>
+        <Version>1.0.2</Version>
+    </PropertyGroup>
 
-  <PropertyGroup Condition="'$(IsPackable)' == 'true'">
-    <Authors>Adiv Asif</Authors>
-    <Company>Adiv Asif</Company>
+    <PropertyGroup Condition="'$(IsPackable)' == 'true'">
+        <Authors>Adiv Asif</Authors>
+        <Company>Adiv Asif</Company>
 
-    <RepositoryUrl>https://github.com/AdivAsif/feature-flags-service</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PackageProjectUrl>https://github.com/AdivAsif/feature-flags-service</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/AdivAsif/feature-flags-service</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageProjectUrl>https://github.com/AdivAsif/feature-flags-service</PackageProjectUrl>
 
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
 
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-  </PropertyGroup>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    </PropertyGroup>
 </Project>

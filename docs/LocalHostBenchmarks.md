@@ -17,7 +17,9 @@ the following commands were used to set up the environment and execute the bench
 1. `docker compose -f .\infrastructure\compose.localhost.yaml up -d`
 2. `$env:ASPNETCORE_ENVIRONMENT = "Production"`
 3.
+
 `$env:ConnectionStrings__FeatureFlagsDatabase = "Host=localhost;Port=5432;Database=feature_flags_db;Username=postgres;Password=password;"`
+
 4. `$env:ConnectionStrings__FeatureFlagsCache = "localhost:6379"`
 5. `$env:JwtSecretKey = “{some_long_string}”`
 6. `$env:EnableDevToken= “true”`
@@ -216,4 +218,55 @@ Docker: 29.2.0
 *Figure 10: Grafana dashboard*
 
 Benchmarks Conducted: 05/02/2026
+Conducted By: Adiv Asif
+
+---
+
+## Benchmarks v1.1 - Computed Evaluations
+
+### Overview
+
+Following the results in Stage 1, I transitioned from **Evaluation Result Caching** to **Flag Definition Caching** (
+see [ADR 0002](adr/0002-move-to-computed-evaluations.md)). These benchmarks represent the performance of the system when
+evaluations are always computed for every request at 50,000+ RPS.
+
+### Key Optimizations in v1.1
+
+- **Removed Evaluation Cache**: Zero Redis/Memory overhead for individual user evaluation results.
+- **Zero-Allocation Context**: `EvaluationContext` refactored to `readonly struct`.
+- **Span-based Parsing**: High-performance group parsing in the evaluation endpoint.
+- **Extended Auth Cache**: API key cache increased to 10 minutes.
+
+## k6 End-to-End Metrics - 50,000 RPS (v1.1)
+
+### HTTP Request Latency Distribution
+
+| Metric | Value (ms) | Target | Status |
+|:-------|:-----------|:-------|:-------|
+| p90    | 2.1        | -      | ✓      |
+| p95    | 2.6016     | -      | ✓      |
+| p99    | 3.9101     | < 5 ms | ✓      |
+| Max    | 145        | -      | -      |
+| Mean   | 1.2        | -      | -      |
+
+### Throughput & Load
+
+| Metric              | Value      | Notes                 |
+|:--------------------|:-----------|:----------------------|
+| Total Requests      | ~6,000,000 | Over 2-minute test    |
+| Requests/sec (avg)  | 49,850     | Sustained throughput  |
+| Requests/sec (peak) | 50,000     | Peak observed RPS     |
+| Failed Requests     | 0 (0%)     | HTTP errors, timeouts |
+
+### Summary Comparison
+
+| Strategy             | p99 Latency | Consistency   | Cache Memory |
+|:---------------------|:------------|:--------------|:-------------|
+| Result Cached (v1.0) | ~4.7 ms     | Eventual      | High         |
+| **Computed (v1.1)**  | **~3.9 ms** | **Immediate** | **Low**      |
+
+*Note: While computed evaluations are technically more CPU-intensive, the reduction in GC pressure and cache management
+overhead resulted in more stable p99 latencies than the initial result-cached implementation at 50k RPS.*
+
+Benchmarks Conducted: 20/02/2026
 Conducted By: Adiv Asif

@@ -5,7 +5,8 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <IsPackable>true</IsPackable>
-        
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
         <PackageId>FeatureFlags.Contracts</PackageId>
         <Title>FeatureFlags.Contracts</Title>
         <Description>Contracts for the .NET client SDK for the Feature Flags Service.</Description>

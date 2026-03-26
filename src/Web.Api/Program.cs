@@ -241,8 +241,8 @@ builder.Services.AddAuthorizationBuilder()
             JwtBearerDefaults.AuthenticationScheme,
             ApiKeyAuthenticationOptions.DefaultScheme);
         policy.RequireAssertion(context =>
-            context.User.HasClaim("scope", "flags:read") || 
-            context.User.IsInRole("user") || 
+            context.User.HasClaim("scope", "flags:read") ||
+            context.User.IsInRole("user") ||
             context.User.IsInRole("admin"));
     })
     .AddPolicy("WriteAccess", policy =>
@@ -251,7 +251,7 @@ builder.Services.AddAuthorizationBuilder()
             JwtBearerDefaults.AuthenticationScheme,
             ApiKeyAuthenticationOptions.DefaultScheme);
         policy.RequireAssertion(context =>
-            context.User.HasClaim("scope", "flags:write") || 
+            context.User.HasClaim("scope", "flags:write") ||
             context.User.IsInRole("admin"));
     })
     .AddPolicy("DeleteAccess", policy =>
@@ -260,7 +260,7 @@ builder.Services.AddAuthorizationBuilder()
             JwtBearerDefaults.AuthenticationScheme,
             ApiKeyAuthenticationOptions.DefaultScheme);
         policy.RequireAssertion(context =>
-            context.User.HasClaim("scope", "flags:delete") || 
+            context.User.HasClaim("scope", "flags:delete") ||
             context.User.IsInRole("admin"));
     })
     .AddPolicy("EvaluateAccess", policy =>

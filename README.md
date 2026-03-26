@@ -216,3 +216,5 @@ self-hosted in production environments.
 
 Adiv Asif · Software Engineer  
 [LinkedIn](https://www.linkedin.com/in/asifadiv/)
+## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

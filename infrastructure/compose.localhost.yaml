@@ -124,7 +124,7 @@
     profiles:
       - with-chaos
     restart: unless-stopped
-    
+  
   metabase:
     image: metabase/metabase:latest
     container_name: feature_flags_metabase

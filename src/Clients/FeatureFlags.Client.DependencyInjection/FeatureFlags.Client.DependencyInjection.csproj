@@ -7,6 +7,7 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <NoWarn>$(NoWarn);1591</NoWarn>
         <IsPackable>true</IsPackable>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
 
         <PackageId>FeatureFlags.Client.DependencyInjection</PackageId>
         <Title>FeatureFlags.Client.DependencyInjection</Title>

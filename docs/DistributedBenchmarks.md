@@ -33,7 +33,7 @@ kind create cluster --name kind-cluster
 #### 2. Build and Load the API Image
 
 Build the API image locally and load it into the Kind cluster. Since Podman on Windows often prefixes images with
-`localhost/`, we will use that naming convention consistently in both the build command and the Kubernetes manifest.
+`localhost/`, I will use that naming convention consistently in both the build command and the Kubernetes manifest.
 
 ```powershell
 # Ensure Podman provider is set for the current session
